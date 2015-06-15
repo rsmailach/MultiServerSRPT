@@ -28,9 +28,8 @@ class GUI(Tk):
 		Tk.__init__(self, master)
 		
 		self.master = master		# reference to parent
-		self.initialize()
+		random.seed(datetime.now())
 
-	def initialize(self):
 		# create the input frame
 		self.frameIn = Input(self)
 		self.frameIn.grid(row = 0, column = 0, padx = 5, pady =5, ipadx = 5, ipady = 5)
@@ -65,13 +64,51 @@ class GUI(Tk):
 		self.console.delete('1.0', END)
 #		self.console.config(state=DISABLED)	# disable (non-editable) console
 
+
+	#COPIED THIS FUNCTION, MAKE IT MY OWN
+	def findMonitors(self):
+		self.monitors = []
+		for k in self.__dict__:
+			a = self.__dict__[k]
+			if isinstance(a, list) and hasattr(a, 'tseries') and hasattr(a, 'yseries'):
+				self.monitors.append(a)
+
+	#COPIED THIS FUNCTION, MAKE IT MY OWN
+	def displayData(self):
+		self.findMonitors()
+		for i in self.monitors:
+			self.writeToConsole('Monitor \'%s\':\n' % i.name)
+			dat = i
+			try: 
+				xlab = i.tlab
+			except:
+				xlab = 'x'
+			try:
+				ylab = i.ylab
+			except:
+				ylab = 'y'
+			sep = ',\t'
+			self.writeToConsole('%s%s%s' % (xlab, sep, ylab))
+			for this in dat:
+				self.writeToConsole('%s%s%s' % (this[0],sep, this[1]))
+        
+
 	def submit(self, event):
 		#self.frameOut.GetOutputList()
 		#self.clearConsole()
 		self.writeToConsole("--------------------------------------------------------------------------------")
 		self.writeToConsole("Simulation begun\n")
 		
-		self.sim = Simulation(self)
+		inputInstance = Input(self)
+		initialize()
+		A = ArrivalClass(self)
+		activate(A, A.Run())
+		simulate(until=inputInstance.valuesList[3])
+
+		self.displayData()		
+
+		self.writeToConsole("\nSimulation complete\n")
+
 
 
 #----------------------------------------------------------------------#
@@ -82,6 +119,8 @@ class GUI(Tk):
 # 
 #----------------------------------------------------------------------#
 class Input(LabelFrame):
+	valuesList = []
+
 	def __init__(self, parent):
 		LabelFrame.__init__(self, parent, text = "Input")
 
@@ -144,17 +183,17 @@ class Input(LabelFrame):
 			
 
 	def GetNumericValues(self):
-		self.arrivalRate = self.arrivalRateInput.get()
-		self.processingRate = self.processingRateInput.get()
-		self.percentError = self.percentErrorInput.get()
-		self.maxSimLength = self.simLengthInput.get()	
+		arrivalRate = self.arrivalRateInput.get()
+		processingRate = self.processingRateInput.get()
+		percentError = self.percentErrorInput.get()
+		maxSimLength = self.simLengthInput.get()	
 
-		if self.arrivalRate <= 0.0: GUI.writeToConsole(self.master, "Arrival rate has to be non-zero!")
-		if self.processingRate <= 0.0: GUI.writeToConsole(self.master, "Processing rate has to be non-zero!")
-		if self.percentError <= 0.0: GUI.writeToConsole(self.master, "Percent error has to be non-zero!")
-		if self.maxSimLength <= 0.0: GUI.writeToConsole(self.master, "Simulation length has to be non-zero!")
+		if arrivalRate <= 0.0: GUI.writeToConsole(self.master, "Arrival rate has to be non-zero!")
+		if processingRate <= 0.0: GUI.writeToConsole(self.master, "Processing rate has to be non-zero!")
+		if percentError <= 0.0: GUI.writeToConsole(self.master, "Percent error has to be non-zero!")
+		if maxSimLength <= 0.0: GUI.writeToConsole(self.master, "Simulation length has to be non-zero!")
 
-		Input.valuesList = [self.arrivalRate, self.processingRate, self.percentError, self.maxSimLength]
+		Input.valuesList = [arrivalRate, processingRate, percentError, maxSimLength]
 		return Input.valuesList
 		
 	def GetDropDownValues(self):
@@ -179,30 +218,106 @@ class Input(LabelFrame):
 class Output(LabelFrame):
 	def __init__(self, parent):
 		LabelFrame.__init__(self, parent, text = "Output")	
-	
+
+
 #----------------------------------------------------------------------#
-# Class: Simulation
+# Class: MachineClass
 #  
-# This class is used to actually model the simmulation.
+# This class is used to actually model the servers.
 #
 #----------------------------------------------------------------------#
-class Simulation():
+class MachineClass(Process):
+	Busy = []	# busy machines
+	Idle = []	# idle machines
+	Queue = []	# queued for the machines
+	IdlingTime = 0.0
+	JobServiceTime = 0.0
+	SystemMon = Monitor()
+	QueueMon = Monitor()
+
+	def __init__(self):
+		Process.__init__(self)
+		MachineClass.Idle.append(self)	# starts idle
+		inputInstance = Input(self)
+	
+		#---------------------------------------------------------------
+		serviceMonitor = Monitor(name = 'Service Times')
+		serviceMonitor.xlab = 'Time'
+		serviceMonitor.ylab = 'Total service time = wait + service'
+		#---------------------------------------------------------------
+	
+		ProcessingDistributions =  {
+			'Exponential': random.expovariate(self.inputInstance.valuesList[1])
+			#'Normal': Rnd.normalvariate(self.ServiceRate)
+			#'Custom':
+		}
+
+		self.generateError()  #########later put on each processing time
+		
+	# dictionary of service distributions
+	def SetServiceDist(self):
+		return Globals.ServiceDistributions[Globals.ServiceDist]
+
+	# generates a percent error for processing time	
+	def generateError(self):
+		self.percentError = pow(-1, random.randint(0,1)) * (self.inputInstance.valuesList[2] * random.random()) 
+		GUI.writeToConsole(self.master, "\nGenerated Error: %.4f"%self.percentError)
+		
+	def Run(self):
+		while 1:
+			# sleep until this machine awakened
+			yield passivate, self
+			MachineClass.Idle.remove(self)
+			MachineClass.Busy.append(self)
+
+			# take next job in queue
+			while MachineClass.Queue != []:
+				Job = MachineClass.Queue.pop(0)			# get job
+				TotalQueuedTime = now() - Job.ArrivalTime	# time spent between job arrival, and just before job is serviced
+				MachineClass.QueueMon.observe(TotalQueuedTime)
+				#MachineClass.QueueMon.tally(TotalQueuedTime)
+				yield hold,self, self.SetServiceDist()	# service the job
+				TotalTimeInSystem = now() - Job.ArrivalTime			# time spent between job arrival, and job completion
+				MachineClass.SystemMon.observe(TotalTimeInSystem) 
+				#MachineClass.SystemMon.tally(TotalTimeInSystem)
+	#-------------------------------------------------------------------
+				MachineClass.serviceMonitor.observe(now() - Job.ArrivalTime)
+	#-------------------------------------------------------------------
+		
+			MachineClass.Busy.remove(self)
+			MachineClass.Idle.append(self)
+
+			GUI.writeToConsole(self.master, "Customer leaves at ", now())
+
+#----------------------------------------------------------------------#
+# Class: JobClass
+#  
+# This class simulates the jobs.
+#
+#----------------------------------------------------------------------#
+class JobClass:			
+	def __init__(self):
+		self.ArrivalTime = now()
+		#print now(), "Event: Job arrives and joins the queu"
+
+
+#----------------------------------------------------------------------#
+# Class: ArrivalClass
+#  
+# This class is used to actually model the servers.
+#
+#----------------------------------------------------------------------#
+class ArrivalClass(Process):
 	def __init__(self, master):
+		Process.__init__(self)
 		self.master = master
 		self.inputInstance = Input(self.master)
-		random.seed(datetime.now())
 #		self.Rnd = Random(12345)
 		self.printParams()
-		self.generateError()  ###################################################################later put on each processing time
 
 		ArrivalDistributions = {
 			'Exponential': random.expovariate(self.inputInstance.valuesList[0])
 			#'Normal': Rnd.normalvariate(self.inputInstance.valuesList[0])
-			#'Custom':
-		}
-		ProcessingDistributions =  {
-			'Exponential': random.expovariate(self.inputInstance.valuesList[1])
-			#'Normal': Rnd.normalvariate(self.ServiceRate)
 			#'Custom':
 		}
 
@@ -213,10 +328,27 @@ class Simulation():
 		GUI.writeToConsole(self.master, "% Error  = " + u"\u00B1" + " %.4f"%self.inputInstance.valuesList[2])
 		GUI.writeToConsole(self.master, "Simulation Length = %.4f"%self.inputInstance.valuesList[3])
 
-	def generateError(self):
-		self.percentError = pow(-1, random.randint(0,1)) * (self.inputInstance.valuesList[2] * random.random()) 
-		GUI.writeToConsole(self.master, "\nGenerated Error: %.4f"%self.percentError)
-		
+	# Dictionary of arrival distributions
+	#def SetArrivalDist(self):
+	#	return ArrivalDistributions[self.inputInstance.valuesList[1])
+
+	def Run(self):
+		global waitMonitor, serviceMonitor
+		GUI.waitMon = waitMonitor = Monitor(name = 'Wait Times')
+		waitMonitor.tlab = 'Time'
+		waitMonitor.ylab = 'Customer waiting time'
+
+		while 1:
+			# wait for arrival of next job			
+			##yield hold, self, self.SetArrivalDist()							
+			yield hold, self, random.expovariate(self.inputInstance.valuesList[0]) # only exponential
+			Job = JobClass()
+			MachineClass.Queue.append(Job)
+
+			# check if any machines are idle and ready for work
+			if MachineClass.Idle != []:
+				reactivate(MachineClass.Idle[0])
+
 
 
 #----------------------------------------------------------------------#
@@ -224,6 +356,8 @@ def main():
 	window = GUI(None)							# instantiate the class with no parent (None)
 	window.title('Single Server SRPT with Errors')	# title the window	
 	#window.geometry("500x600")						# set window size
+
+
 	window.mainloop()								# loop indefinitely, wait for events
 
 
