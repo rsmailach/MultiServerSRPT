@@ -11,8 +11,10 @@
 
 from SimPy.Simulation import *
 from Tkinter import *
+from datetime import datetime
 from random import Random,expovariate,uniform,normalvariate # https://docs.python.org/2/library/random.html
 import ttk
+
 
 #----------------------------------------------------------------------#
 # Class: GUI
@@ -59,14 +61,17 @@ class GUI(Tk):
 		self.console.config(state=DISABLED)	# disable (non-editable) console
 
 	def clearConsole(self):
+#		self.console.config(state=NORMAL) # make console editable
 		self.console.delete('1.0', END)
+#		self.console.config(state=DISABLED)	# disable (non-editable) console
 
 	def submit(self, event):
-		#simulation.Run(self)
 		#self.frameOut.GetOutputList()
-		self.writeToConsole("\nSimulation button pressed")
-
-
+		#self.clearConsole()
+		self.writeToConsole("--------------------------------------------------------------------------------")
+		self.writeToConsole("Simulation begun\n")
+		
+		self.sim = Simulation(self)
 
 
 #----------------------------------------------------------------------#
@@ -80,6 +85,11 @@ class Input(LabelFrame):
 	def __init__(self, parent):
 		LabelFrame.__init__(self, parent, text = "Input")
 
+		#self.arrivalRate = 0.0
+		#self.processingRate = 0.0
+		#self.percentError = 0.0
+		#self.simLength = 0.0
+		
 		self.arrivalRateInput = DoubleVar()
 		self.processingRateInput = DoubleVar()
 		self.percentErrorInput = DoubleVar()
@@ -125,11 +135,6 @@ class Input(LabelFrame):
 		#self.comboBox_1.grid(row = 0, column = 2)
 		self.comboBox_2.grid(row = 1, column = 2)
 
-				
-
-	
-
-
 	def OnButtonClick(self):
 		self.GetNumericValues()
 		self.GetDropDownValues()
@@ -139,23 +144,22 @@ class Input(LabelFrame):
 			
 
 	def GetNumericValues(self):
-		arrivalRate = self.arrivalRateInput.get()
-		processingRate = self.processingRateInput.get()
-		percentError = self.percentErrorInput.get()
-		maxSimLength = self.simLengthInput.get()
-	
+		self.arrivalRate = self.arrivalRateInput.get()
+		self.processingRate = self.processingRateInput.get()
+		self.percentError = self.percentErrorInput.get()
+		self.maxSimLength = self.simLengthInput.get()	
 
-		if arrivalRate <= 0: GUI.writeToConsole(self.master, "Arrival rate has to be non-zero!")
-		if processingRate <= 0.0: GUI.writeToConsole(self.master, "Processing rate has to be non-zero!")
-		if percentError <= 0.0: GUI.writeToConsole(self.master, "Percent error has to be non-zero!")
-		if maxSimLength <= 0.0: GUI.writeToConsole(self.master, "Simulation length has to be non-zero!")
+		if self.arrivalRate <= 0.0: GUI.writeToConsole(self.master, "Arrival rate has to be non-zero!")
+		if self.processingRate <= 0.0: GUI.writeToConsole(self.master, "Processing rate has to be non-zero!")
+		if self.percentError <= 0.0: GUI.writeToConsole(self.master, "Percent error has to be non-zero!")
+		if self.maxSimLength <= 0.0: GUI.writeToConsole(self.master, "Simulation length has to be non-zero!")
 
-		Input.valuesList = [arrivalRate, processingRate, percentError, maxSimLength]
+		Input.valuesList = [self.arrivalRate, self.processingRate, self.percentError, self.maxSimLength]
 		return Input.valuesList
 		
 	def GetDropDownValues(self):
 		#if self.comboBox_1.get() == 'Select Distribution': print "Box 1 has to have a selection"
-		if self.comboBox_2.get() == 'Select Distribution': GUI.writeToConsole(self.master, "Box 2 has to have a selection")
+		if self.comboBox_2.get() == 'Select Distribution': GUI.writeToConsole(self.master, "You must select a distribution for the processing rate")
 
 		Input.distList = ["", self.comboBox_2.get(), "", ""]
 		return Input.distList
@@ -176,6 +180,44 @@ class Output(LabelFrame):
 	def __init__(self, parent):
 		LabelFrame.__init__(self, parent, text = "Output")	
 	
+#----------------------------------------------------------------------#
+# Class: Simulation
+#  
+# This class is used to actually model the simmulation.
+#
+#----------------------------------------------------------------------#
+class Simulation():
+	def __init__(self, master):
+		self.master = master
+		self.inputInstance = Input(self.master)
+		random.seed(datetime.now())
+#		self.Rnd = Random(12345)
+		self.printParams()
+		self.generateError()  ###################################################################later put on each processing time
+
+		ArrivalDistributions = {
+			'Exponential': random.expovariate(self.inputInstance.valuesList[0])
+			#'Normal': Rnd.normalvariate(self.inputInstance.valuesList[0])
+			#'Custom':
+		}
+		ProcessingDistributions =  {
+			'Exponential': random.expovariate(self.inputInstance.valuesList[1])
+			#'Normal': Rnd.normalvariate(self.ServiceRate)
+			#'Custom':
+		}
+
+	def printParams(self):
+		GUI.writeToConsole(self.master, "\nPARAMETERS:")
+		GUI.writeToConsole(self.master, "Arrival Rate = %.4f"%self.inputInstance.valuesList[0])
+		GUI.writeToConsole(self.master, "Processing Rate = %.4f"%self.inputInstance.valuesList[1])
+		GUI.writeToConsole(self.master, "% Error  = " + u"\u00B1" + " %.4f"%self.inputInstance.valuesList[2])
+		GUI.writeToConsole(self.master, "Simulation Length = %.4f"%self.inputInstance.valuesList[3])
+
+	def generateError(self):
+		self.percentError = pow(-1, random.randint(0,1)) * (self.inputInstance.valuesList[2] * random.random()) 
+		GUI.writeToConsole(self.master, "\nGenerated Error: %.4f"%self.percentError)
+		
+
 
 #----------------------------------------------------------------------#
 def main():
