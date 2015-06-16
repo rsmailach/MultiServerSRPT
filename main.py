@@ -64,45 +64,18 @@ class GUI(Tk):
 		self.console.delete('1.0', END)
 #		self.console.config(state=DISABLED)	# disable (non-editable) console
 
-
-	#COPIED THIS FUNCTION, MAKE IT MY OWN
-	def findMonitors(self):
-		self.monitors = []
-		for k in self.__dict__:
-			a = self.__dict__[k]
-			if isinstance(a, list) and hasattr(a, 'tseries') and hasattr(a, 'yseries'):
-				self.monitors.append(a)
-
-	#COPIED THIS FUNCTION, MAKE IT MY OWN
-	def displayData(self):
-		self.findMonitors()
-		for i in self.monitors:
-			self.writeToConsole('Monitor \'%s\':\n' % i.name)
-			dat = i
-			try: 
-				xlab = i.tlab
-			except:
-				xlab = 'x'
-			try:
-				ylab = i.ylab
-			except:
-				ylab = 'y'
-			sep = ',\t'
-			self.writeToConsole('%s%s%s' % (xlab, sep, ylab))
-			for this in dat:
-				self.writeToConsole('%s%s%s' % (this[0],sep, this[1]))
-
 	def DisplayData(self):
-		self.writeToConsole('SINGLE SERVER SRPT')
+		self.writeToConsole('\nSINGLE SERVER SRPT')
 		self.writeToConsole('Average number in the system is %s' %m.timeAverage())
 		self.writeToConsole('Average time in system is %s' %mT.mean())
 		self.writeToConsole('Actual average service-time is %s' %msT.mean())
 
 	def submit(self, event):
+		global m, mT, msT, server
 		#self.frameOut.GetOutputList()
 		#self.clearConsole()
 		self.writeToConsole("--------------------------------------------------------------------------------")
-		self.writeToConsole("Simulation begun\n")
+		self.writeToConsole("Simulation begun")
 		
 		m = Monitor() # monitor for number of jobs
 		mT = Monitor() # monitor for time in system
@@ -119,7 +92,7 @@ class GUI(Tk):
 
 		self.DisplayData()		
 
-		self.writeToConsole("\nSimulation complete\n")
+		self.writeToConsole("\nSimulation complete")
 
 
 
@@ -136,11 +109,6 @@ class Input(LabelFrame):
 	def __init__(self, parent):
 		LabelFrame.__init__(self, parent, text = "Input")
 
-		#self.arrivalRate = 0.0
-		#self.processingRate = 0.0
-		#self.percentError = 0.0
-		#self.simLength = 0.0
-		
 		self.arrivalRateInput = DoubleVar()
 		self.processingRateInput = DoubleVar()
 		self.percentErrorInput = DoubleVar()
@@ -239,26 +207,12 @@ class Output(LabelFrame):
 #
 #----------------------------------------------------------------------#
 class JobClass(Process):
-	#Busy = []	# busy machines
-	#Idle = []	# idle machines
-	#Queue = []	# queued for the machines
-	#IdlingTime = 0.0
-	#JobServiceTime = 0.0
-	#SystemMon = Monitor()
-	#QueueMon = Monitor()
 	NumJobsInSys = 0
 
 	def __init__(self, master):
 		Process.__init__(self)
-		#MachineClass.Idle.append(self)	# starts idle
 		self.master = master
 		self.inputInstance = Input(self.master)
-	
-		#---------------------------------------------------------------
-		#serviceMonitor = Monitor(name = 'Service Times')
-		#serviceMonitor.xlab = 'Time'
-		#serviceMonitor.ylab = 'Total service time = wait + service'
-		#---------------------------------------------------------------
 	
 		ProcessingDistributions =  {
 			'Exponential': random.expovariate(self.inputInstance.valuesList[1])
@@ -266,8 +220,6 @@ class JobClass(Process):
 			#'Custom':
 		}
 
-		#self.generateError()  #########later put on each processing time
-		
 	# dictionary of service distributions
 	def SetServiceDist(self):
 		return Globals.ServiceDistributions[Globals.ServiceDist]
@@ -280,8 +232,8 @@ class JobClass(Process):
 	def Run(self):
 		#while 1:
 			arrTime = now()
-			JobClass.NumInSys += 1
-			m.observe(JobClass.NumInSys)
+			JobClass.NumJobsInSys += 1
+			m.observe(JobClass.NumJobsInSys)
 			
 			yield request,self,server
 		
@@ -292,44 +244,11 @@ class JobClass(Process):
 
 			# job completed, release
 			yield release, self, server
-			JobClass.NumInSys -= 1
-			m.observe(JobClass.NumInSys)
-			mT.observe(now() - arrTime)
-			
-			# sleep until this machine awakened
-			#yield passivate, self
-			#MachineClass.Idle.remove(self)
-			#MachineClass.Busy.append(self)
+			JobClass.NumJobsInSys -= 1
+			m.observe(JobClass.NumJobsInSys)
+			mT.observe(now() - arrTime)	
 
-			# take next job in queue
-			#while MachineClass.Queue != []:
-			#	Job = MachineClass.Queue.pop(0)			# get job
-			#	TotalQueuedTime = now() - Job.ArrivalTime	# time spent between job arrival, and just before job is serviced
-			#	MachineClass.QueueMon.observe(TotalQueuedTime)
-				#MachineClass.QueueMon.tally(TotalQueuedTime)
-			#	yield hold,self, self.SetServiceDist()	# service the job
-			#	TotalTimeInSystem = now() - Job.ArrivalTime			# time spent between job arrival, and job completion
-			#	MachineClass.SystemMon.observe(TotalTimeInSystem) 
-				#MachineClass.SystemMon.tally(TotalTimeInSystem)
-	#-------------------------------------------------------------------
-			#	MachineClass.serviceMonitor.observe(now() - Job.ArrivalTime)
-	#-------------------------------------------------------------------
-		
-			#MachineClass.Busy.remove(self)
-			#MachineClass.Idle.append(self)
-
-			GUI.writeToConsole(self.master, "Customer leaves at ", now())
-
-#----------------------------------------------------------------------#
-# Class: JobClass
-#  
-# This class simulates the jobs.
-#
-#----------------------------------------------------------------------#
-#class JobClass:			
-#	def __init__(self):
-#		self.ArrivalTime = now()
-		#print now(), "Event: Job arrives and joins the queu"
+			GUI.writeToConsole(self.master, "\nCustomer leaves at %s"%now())
 
 
 #----------------------------------------------------------------------#
@@ -343,8 +262,8 @@ class ArrivalClass(Process):
 		Process.__init__(self)
 		self.master = master
 		self.inputInstance = Input(self.master)
-#		self.Rnd = Random(12345)
 		self.printParams()
+
 
 		ArrivalDistributions = {
 			'Exponential': random.expovariate(self.inputInstance.valuesList[0])
@@ -364,26 +283,13 @@ class ArrivalClass(Process):
 	#	return ArrivalDistributions[self.inputInstance.valuesList[1])
 
 	def Run(self):
-		#global waitMonitor, serviceMonitor
-		#GUI.waitMon = waitMonitor = Monitor(name = 'Wait Times')
-		#waitMonitor.tlab = 'Time'
-		#waitMonitor.ylab = 'Customer waiting time'
-
-		counter = 0
 		while 1:
-			A = JobClass(self)
-			activate(A,A.Run(self.inputInstance.valuesList[1]), delay=0) # activate over mean service time #####################
+			A = JobClass(self.master)
+			activate(A, A.Run(), delay=0)
 
 			# wait for arrival of next job			
-			##yield hold, self, self.SetArrivalDist()							
+			##yield hold, self, self.SetArrivalDist()		
 			yield hold, self, random.expovariate(self.inputInstance.valuesList[0]) # only exponential for this application
-					
-			#MachineClass.Queue.append(Job)
-
-			# check if any machines are idle and ready for work
-			#if MachineClass.Idle != []:
-			#	reactivate(MachineClass.Idle[0])
-			counter += 1
 
 
 
