@@ -64,6 +64,14 @@ class GUI(Tk):
 		self.console.delete('1.0', END)
         #       self.console.config(state=DISABLED) # disable (non-editable) console
 
+	def printParams(self, arrRate, procRate, percError, splitMech, simLength):
+		self.writeToConsole("\nPARAMETERS:")
+		self.writeToConsole("Arrival Rate = %.4f"%arrRate)
+		self.writeToConsole("Processing Rate = %.4f"%procRate)
+		self.writeToConsole("% Error  = " + u"\u00B1" + " %.4f"%percError)
+		self.writeToConsole("Splitting mechanism = %d"%splitMech)
+		self.writeToConsole("Simulation Length = %.4f\n"%simLength)
+
 	def DisplayData(self):
 		self.writeToConsole('\nSINGLE SERVER SRPT')
 		self.writeToConsole('Average number of jobs in the system at any given time %s' %ArrivalClass.m.timeAverage())
@@ -77,11 +85,19 @@ class GUI(Tk):
 		self.writeToConsole("Simulation begun")
 
 		inputInstance = Input(self)
+		resource=Resource(capacity=1, name='Processor')
+
+		self.printParams(inputInstance.valuesList[0], inputInstance.valuesList[1],\
+				 inputInstance.valuesList[2], inputInstance.valuesList[3],\
+				 inputInstance.valuesList[4])
+
 		initialize()
 		A = ArrivalClass(self)
-		activate(A, A.Run())
+		activate(A, A.GenerateArrivals(	inputInstance.valuesList[0], inputInstance.valuesList[1],\
+						inputInstance.distList[1], inputInstance.valuesList[2],\
+						inputInstance.valuesList[3], resource))
 		ArrivalClass.m.observe(0)        # number in system is 0 at the start
-		simulate(until=inputInstance.valuesList[3])
+		simulate(until=inputInstance.valuesList[4])
 
 		self.DisplayData()
 		
@@ -105,25 +121,27 @@ class Input(LabelFrame):
 		self.arrivalRateInput = DoubleVar()
 		self.processingRateInput = DoubleVar()
 		self.percentErrorInput = DoubleVar()
+		self.splittingMechanismInput = IntVar()
 		self.simLengthInput = DoubleVar()
 
 		# create widgets, parent = self because window is parent
 		# Labels
-		labels = [u'\u03bb', u'\u03bc', '% error     ' u"\u00B1", 'simulation length']
+		labels = [u'\u03bb', u'\u03bc', '% error     ' u"\u00B1", 'splitting mechansim', 'simulation length']
 		r=0
 		c=0
 		for elem in labels:
 			Label(self, text=elem).grid(row=r, column=c)
 			r=r+1
-			if r > 3:
-				r=0
-				c=3
+			#if r > 3:
+			#	r=0
+			#	c=3
 
 		# Entry Boxes
 		self.entry_1 = Entry(self, textvariable = self.arrivalRateInput)
 		self.entry_2 = Entry(self, textvariable = self.processingRateInput)
 		self.entry_3 = Entry(self, textvariable = self.percentErrorInput)
-		self.entry_4 = Entry(self, textvariable = self.simLengthInput)
+		self.entry_4 = Entry(self, textvariable = self.splittingMechanismInput)
+		self.entry_5 = Entry(self, textvariable = self.simLengthInput)
 
 		# Simulate Button
 		self.simulateButton = Button(self, text = "SIMULATE", command = self.OnButtonClick)
@@ -141,8 +159,9 @@ class Input(LabelFrame):
 		self.entry_2.grid(row = 1, column = 1)
 		self.entry_3.grid(row = 2, column = 1)
 		self.entry_4.grid(row = 3, column = 1)
+		self.entry_5.grid(row = 4, column = 1)
 
-		self.simulateButton.grid(row = 4, columnspan = 2)
+		self.simulateButton.grid(row = 5, columnspan = 2)
 
 		#self.comboBox_1.grid(row = 0, column = 2)
 		self.comboBox_2.grid(row = 1, column = 2)
@@ -159,21 +178,23 @@ class Input(LabelFrame):
 		arrivalRate = self.arrivalRateInput.get()
 		processingRate = self.processingRateInput.get()
 		percentError = self.percentErrorInput.get()
+		splittingMechanism = self.splittingMechanismInput.get()
 		maxSimLength = self.simLengthInput.get()
 
 		if arrivalRate <= 0.0: GUI.writeToConsole(self.master, "Arrival rate has to be non-zero!")
 		if processingRate <= 0.0: GUI.writeToConsole(self.master, "Processing rate has to be non-zero!")
 		if percentError <= 0.0: GUI.writeToConsole(self.master, "Percent error has to be non-zero!")
+		#if splittingMechanism <= 0: GUI.writeToConsole(self.master, "Splitting mechanism has to be non-zero!")
 		if maxSimLength <= 0.0: GUI.writeToConsole(self.master, "Simulation length has to be non-zero!")
 
-		Input.valuesList = [arrivalRate, processingRate, percentError, maxSimLength]
+		Input.valuesList = [arrivalRate, processingRate, percentError, splittingMechanism, maxSimLength]
 		return Input.valuesList
 
 	def GetDropDownValues(self):
 		#if self.comboBox_1.get() == 'Select Distribution': print "Box 1 has to have a selection"
 		if self.comboBox_2.get() == 'Select Distribution': GUI.writeToConsole(self.master, "You must select a distribution for the processing rate")
 
-		Input.distList = ["", self.comboBox_2.get(), "", ""]
+		Input.distList = ["", self.comboBox_2.get(), "", "", ""]
 		return Input.distList
 
 	#def CreateList(self):
@@ -202,57 +223,55 @@ class Output(LabelFrame):
 class JobClass(Process):
 	NumJobsInSys = 0
 	CompletedJobs = 0
+	Queue = [] 		# jobs queued for the machines
 
 	def __init__(self, master):
 		Process.__init__(self)
 		self.master = master
-		self.server=Resource(capacity=1, name='Processor')
-		self.inputInstance = Input(self.master)
 
+	# dictionary of service distributions
+	def SetServiceDist(self, procRate, procDist):
 		self.ServiceDistributions =  {
-			'Exponential': random.expovariate(self.inputInstance.valuesList[1])
+			'Exponential': random.expovariate(procRate)
 			#'Normal': Rnd.normalvariate(self.ServiceRate)
 			#'Custom':
 		}
-
-	# dictionary of service distributions
-	def SetServiceDist(self):
-		return self.ServiceDistributions[self.inputInstance.distList[1]]
+		return self.ServiceDistributions[procDist]
 
 	# generates a percent error for processing time
-	def generateError(self):
-		self.percentError = pow(-1, random.randint(0,1)) * (self.inputInstance.valuesList[2] * random.random())
-		GUI.writeToConsole(self.master, "Generated Error: %.4f"%self.percentError)
+	def GenerateError(self, percError):
+		self.percentError = pow(-1, random.randint(0,1)) * (percError * random.random())
+		#GUI.writeToConsole(self.master, "Generated Error: %.4f"%self.percentError)
 		return self.percentError
 
-	def Run(self):
-		arrTime = now()
-		JobClass.NumJobsInSys += 1
-		ArrivalClass.m.observe(JobClass.NumJobsInSys)
+	def ExecuteJobs(self, arrRate, procRate, procDist, percError, splitMech, server):
+		#while JobClass.Queue != []:
+		#	Job = JobClass.Queue.pop(0)	# get job
+			arrTime = now()
+			JobClass.NumJobsInSys += 1
+			ArrivalClass.m.observe(JobClass.NumJobsInSys)
 
-		GUI.writeToConsole(self.master, "%s Event: Job arrives and joins queue"%now())
-		yield request,self,self.server
+			GUI.writeToConsole(self.master, "%s arrives and joins queue                 | %s"%(self.name, now()))
+			yield request,self, server
+			GUI.writeToConsole(self.master, "%s server request granted, begin executing | %s"%(self.name, now()))
 
-		# generate processing time for the job
-		# processingTime = expovariate(self.inputInstance.valuesList[1])
-		processingTime = self.SetServiceDist()
-		GUI.writeToConsole(self.master, "%s Event: Job begins service"%now())
-		GUI.writeToConsole(self.master, "Actual processing time: %s"%processingTime)
-		
-		errorProcessingTime = (1 + (self.generateError()/100.0))*processingTime
-		GUI.writeToConsole(self.master, "Processing time with error (what system thinks is processing time): %s"%errorProcessingTime)
-		
-		ArrivalClass.msT.observe(processingTime)
-		yield hold, self, processingTime 
+			# generate processing time for the job
+			procTime = self.SetServiceDist(procRate, procDist)
+			#GUI.writeToConsole(self.master, "Actual processing time: %s"%processingTime)
+			errorProcTime = (1 + (self.GenerateError(percError)/100.0))*procTime
+			#GUI.writeToConsole(self.master, "Processing time with error (what system thinks correct): %s"%errorProcessingTime)
+			ArrivalClass.msT.observe(procTime)
+			yield hold, self, procTime 
 
-		# job completed, release
-		yield release, self, self.server
-		GUI.writeToConsole(self.master, "%s Event: Job completed"%now())
-		JobClass.NumJobsInSys -= 1
-		ArrivalClass.m.observe(JobClass.NumJobsInSys)
-		ArrivalClass.mT.observe(now() - arrTime)
-
-		#GUI.writeToConsole(self.master, "Current number of jobs in the system %s"%JobClass.NumJobsInSys)
+			# job completed, release
+			yield release, self, server
+			GUI.writeToConsole(self.master, "%s completed                               | %s"%(self.name, now()))
+			JobClass.NumJobsInSys -= 1
+			ArrivalClass.m.observe(JobClass.NumJobsInSys)
+			ArrivalClass.mT.observe(now() - arrTime)
+	
+			#GUI.writeToConsole(self.master, "Current number of jobs in the system %s"%JobClass.NumJobsInSys)
+			#GUI.writeToConsole(self.master, "\nQUEUE LENGTH: %d"%len(self.server.queue))
 
 
 #----------------------------------------------------------------------#
@@ -270,39 +289,42 @@ class ArrivalClass(Process):
 		ArrivalClass.mT = Monitor() # monitor for time in system
 		ArrivalClass.msT = Monitor() # monitor for generated service times
 
+		# reset monitors 
 		ArrivalClass.m.reset()
 		ArrivalClass.mT.reset()
-		ArrivalClass.msT.reset()
+		ArrivalClass.msT.reset()	
+	
+		self.ctr = 0
 
-		self.inputInstance = Input(self.master)
-		self.printParams()
 
 
+
+
+	# Dictionary of arrival distributions
+	def SetArrivalDist(self, arrRate, arrDist):
 		ArrivalDistributions = {
-			'Exponential': random.expovariate(self.inputInstance.valuesList[0])
+			'Exponential': random.expovariate(arrRate)
 			#'Normal': Rnd.normalvariate(self.inputInstance.valuesList[0])
 			#'Custom':
 		}
+		return ArrivalDistributions[arrDist]
 
-	def printParams(self):
-		GUI.writeToConsole(self.master, "\nPARAMETERS:")
-		GUI.writeToConsole(self.master, "Arrival Rate = %.4f"%self.inputInstance.valuesList[0])
-		GUI.writeToConsole(self.master, "Processing Rate = %.4f"%self.inputInstance.valuesList[1])
-		GUI.writeToConsole(self.master, "% Error  = " + u"\u00B1" + " %.4f"%self.inputInstance.valuesList[2])
-		GUI.writeToConsole(self.master, "Simulation Length = %.4f\n"%self.inputInstance.valuesList[3])
-
-	# Dictionary of arrival distributions
-	def SetArrivalDist(self):
-	   return ArrivalDistributions[self.inputInstance.distList[0]]
-
-	def Run(self):
+	
+	def GenerateArrivals(self, arrRate, procRate, procDist, percError, splitMech, server):
 		while 1:
-			A = JobClass(self.master)
-			activate(A, A.Run(), delay=0)
+			J = JobClass(self.master)
+			J.name = "Job%02d"%self.ctr
+			#JobClass.Queue.append(A)
+			#GUI.writeToConsole(self.master, "QUEUE LENGTH: %d"%len(JobClass.Queue))
+			activate(J, J.ExecuteJobs(arrRate, procRate, procDist, percError, splitMech, server), delay=0)
 
 			# wait for arrival of next job
 			##yield hold, self, self.SetArrivalDist()
-			yield hold, self, random.expovariate(self.inputInstance.valuesList[0]) # only exponential for this application
+			yield hold, self, random.expovariate(arrRate) # only exponential for this application
+			self.ctr += 1
+
+			
+			
 
 
 
