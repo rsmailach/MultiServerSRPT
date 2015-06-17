@@ -66,28 +66,21 @@ class GUI(Tk):
 
 	def DisplayData(self):
 		self.writeToConsole('\nSINGLE SERVER SRPT')
-		self.writeToConsole('Average number in the system is %s' %m.timeAverage())
-		self.writeToConsole('Average time in system is %s' %mT.mean())
-		self.writeToConsole('Actual average service-time is %s' %msT.mean())
+		self.writeToConsole('Average number of jobs in the system at any given time %s' %ArrivalClass.m.timeAverage())
+		self.writeToConsole('Average time in system, from start to completion is %s' %ArrivalClass.mT.mean())
+		self.writeToConsole('Average processing time, based on generated service times is %s' %ArrivalClass.msT.mean())
 
 	def submit(self, event):
-		global m, mT, msT, server
 		#self.frameOut.GetOutputList()
 		#self.clearConsole()
 		self.writeToConsole("--------------------------------------------------------------------------------")
 		self.writeToConsole("Simulation begun")
 
-		m = Monitor() # monitor for number of jobs
-		mT = Monitor() # monitor for time in system
-		msT = Monitor() # monitor for generated service times
-
-		server=Resource(capacity=1, name='Processor')
-
 		inputInstance = Input(self)
 		initialize()
 		A = ArrivalClass(self)
 		activate(A, A.Run())
-		m.observe(0)        # number in system is 0 at the start
+		ArrivalClass.m.observe(0)        # number in system is 0 at the start
 		simulate(until=inputInstance.valuesList[3])
 
 		self.DisplayData()
@@ -213,6 +206,7 @@ class JobClass(Process):
 	def __init__(self, master):
 		Process.__init__(self)
 		self.master = master
+		self.server=Resource(capacity=1, name='Processor')
 		self.inputInstance = Input(self.master)
 
 		self.ServiceDistributions =  {
@@ -228,32 +222,37 @@ class JobClass(Process):
 	# generates a percent error for processing time
 	def generateError(self):
 		self.percentError = pow(-1, random.randint(0,1)) * (self.inputInstance.valuesList[2] * random.random())
-		GUI.writeToConsole(self.master, "\nGenerated Error: %.4f"%self.percentError)
+		GUI.writeToConsole(self.master, "Generated Error: %.4f"%self.percentError)
+		return self.percentError
 
 	def Run(self):
 		arrTime = now()
 		JobClass.NumJobsInSys += 1
-		m.observe(JobClass.NumJobsInSys)
+		ArrivalClass.m.observe(JobClass.NumJobsInSys)
 
 		GUI.writeToConsole(self.master, "%s Event: Job arrives and joins queue"%now())
-		yield request,self,server
+		yield request,self,self.server
 
 		# generate processing time for the job
 		# processingTime = expovariate(self.inputInstance.valuesList[1])
 		processingTime = self.SetServiceDist()
 		GUI.writeToConsole(self.master, "%s Event: Job begins service"%now())
-		GUI.writeToConsole(self.master, "Processing time: %s"%processingTime)
-		self.generateError()
-		msT.observe(processingTime)
+		GUI.writeToConsole(self.master, "Actual processing time: %s"%processingTime)
+		
+		errorProcessingTime = (1 + (self.generateError()/100.0))*processingTime
+		GUI.writeToConsole(self.master, "Processing time with error (what system thinks is processing time): %s"%errorProcessingTime)
+		
+		ArrivalClass.msT.observe(processingTime)
 		yield hold, self, processingTime 
 
 		# job completed, release
-		yield release, self, server
+		yield release, self, self.server
 		GUI.writeToConsole(self.master, "%s Event: Job completed"%now())
 		JobClass.NumJobsInSys -= 1
-		JobClass.CompletedJobs += 1
-		m.observe(JobClass.NumJobsInSys)
-		mT.observe(now() - arrTime)
+		ArrivalClass.m.observe(JobClass.NumJobsInSys)
+		ArrivalClass.mT.observe(now() - arrTime)
+
+		#GUI.writeToConsole(self.master, "Current number of jobs in the system %s"%JobClass.NumJobsInSys)
 
 
 #----------------------------------------------------------------------#
@@ -266,6 +265,15 @@ class ArrivalClass(Process):
 	def __init__(self, master):
 		Process.__init__(self)
 		self.master = master
+
+		ArrivalClass.m = Monitor() # monitor for number of jobs
+		ArrivalClass.mT = Monitor() # monitor for time in system
+		ArrivalClass.msT = Monitor() # monitor for generated service times
+
+		ArrivalClass.m.reset()
+		ArrivalClass.mT.reset()
+		ArrivalClass.msT.reset()
+
 		self.inputInstance = Input(self.master)
 		self.printParams()
 
