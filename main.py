@@ -93,9 +93,10 @@ class GUI(Tk):
 
 		initialize()
 		A = ArrivalClass(self)
-		activate(A, A.GenerateArrivals(	inputInstance.valuesList[0], inputInstance.valuesList[1],\
-						inputInstance.distList[1], inputInstance.valuesList[2],\
-						inputInstance.valuesList[3], resource))
+		activate(A, A.GenerateArrivals(	inputInstance.valuesList[0], "Exponential",\
+						inputInstance.valuesList[1], inputInstance.distList[1],\
+						inputInstance.valuesList[2], inputInstance.valuesList[3], resource))
+
 		ArrivalClass.m.observe(0)        # number in system is 0 at the start
 		simulate(until=inputInstance.valuesList[4])
 
@@ -244,7 +245,7 @@ class JobClass(Process):
 		#GUI.writeToConsole(self.master, "Generated Error: %.4f"%self.percentError)
 		return self.percentError
 
-	def ExecuteJobs(self, arrRate, procRate, procDist, percError, splitMech, server):
+	def ExecuteJobs(self, procRate, procDist, percError, splitMech, server):
 		#while JobClass.Queue != []:
 		#	Job = JobClass.Queue.pop(0)	# get job
 			arrTime = now()
@@ -310,17 +311,16 @@ class ArrivalClass(Process):
 		return ArrivalDistributions[arrDist]
 
 	
-	def GenerateArrivals(self, arrRate, procRate, procDist, percError, splitMech, server):
+	def GenerateArrivals(self, arrRate, arrDist, procRate, procDist, percError, splitMech, server):
 		while 1:
 			J = JobClass(self.master)
 			J.name = "Job%02d"%self.ctr
 			#JobClass.Queue.append(A)
 			#GUI.writeToConsole(self.master, "QUEUE LENGTH: %d"%len(JobClass.Queue))
-			activate(J, J.ExecuteJobs(arrRate, procRate, procDist, percError, splitMech, server), delay=0)
+			activate(J, J.ExecuteJobs(procRate, procDist, percError, splitMech, server), delay=0)
 
 			# wait for arrival of next job
-			##yield hold, self, self.SetArrivalDist()
-			yield hold, self, random.expovariate(arrRate) # only exponential for this application
+			yield hold, self, self.SetArrivalDist(arrRate, arrDist)
 			self.ctr += 1
 
 			
