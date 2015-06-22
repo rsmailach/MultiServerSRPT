@@ -165,7 +165,7 @@ class Input(LabelFrame):
 		#self.comboBox_1.current(0) # set selection
 
 		self.comboBox_2 = ttk.Combobox(self, values = self.distributions, state = 'readonly')
-		self.comboBox_2.current(0) # set selection
+		self.comboBox_2.current(1) # set default selection 					#####################CHANGE LATER
 
 		self.entry_1.grid(row = 0, column = 1)
 		self.entry_2.grid(row = 1, column = 1)
@@ -242,26 +242,23 @@ class ServerClass(Process):
 		self.master = master
 
 
-
-
-
 	def ExecuteJobs(self, server):
 		ServerClass.NumJobsInSys += 1
 		ArrivalClass.m.observe(ServerClass.NumJobsInSys)
+		Job = ServerClass.Queue.pop(0)			# job is no longer in queue, now going to be processed
 
-		GUI.writeToConsole(self.master, "%s requests service                        | %s"%(self.name, now()))
+		GUI.writeToConsole(self.master, "%.6f | %s requests service"%(now(), Job.name))
 		yield request,self, server
-		GUI.writeToConsole(self.master, "%s server request granted, begin executing | %s"%(self.name, now()))
-		Job = MachineClass.Queue.pop(0)			# job is no longer in queue, now going to be processed
-		
+		GUI.writeToConsole(self.master, "%.6f | %s server request granted, begin executing"%(now(), Job.name))
 
-
-		ArrivalClass.msT.observe(procTime)
+		ArrivalClass.msT.observe(Job.procTime)
 		yield hold, self, Job.procTime 
 
 		# job completed, release
 		yield release, self, server
-		GUI.writeToConsole(self.master, "%s completed                               | %s"%(self.name, now()))
+		GUI.writeToConsole(self.master, "%.6f | %s completed"%(now(), Job.name))
+
+
 		ServerClass.NumJobsInSys -= 1
 		ArrivalClass.m.observe(ServerClass.NumJobsInSys)
 		ArrivalClass.mT.observe(now() - Job.arrivalTime)
@@ -279,8 +276,6 @@ class JobClass(object):
 	def __init__(self):
 		self.arrivalTime = now()
 		self.procTime = 0
-
-
 
 	# dictionary of service distributions
 	def SetServiceDist(self, procRate, procDist):
@@ -336,7 +331,9 @@ class ArrivalClass(Process):
 
 	def SortQueue(self, splitMech):
 		#grab the previous m (splitMech) jobs to sort jobs by processing time (procTime) 
-		Server.Queue[-(splitMech+1):] = sorted(Server.Queue[-(splitMech+1):], key=lambda J: J.procTime) 
+		ServerClass.Queue[-(splitMech+1):] = sorted(ServerClass.Queue[-(splitMech+1):], key=lambda JobClass: JobClass.procTime) 
+		print [job.name + "  " + str(job.procTime) for job in ServerClass.Queue]
+		return ServerClass.Queue
 	
 	def GenerateArrivals(self, arrRate, arrDist, procRate, procDist, percError, splitMech, server):
 		while 1:
@@ -347,11 +344,12 @@ class ArrivalClass(Process):
 			J.SetJobAttributes(procRate, procDist, percError)
 			J.name = "Job%02d"%self.ctr
 			
-			ServerClass.Queue.append(J) #add job to queue
+			ServerClass.Queue.append(J) # add job to queue
+			self.SortQueue(splitMech)	    # sort jobs
 			GUI.writeToConsole(self.master, "QUEUE LENGTH: %d"%len(ServerClass.Queue))
-	
-			activate(J, J.ExecuteJobs(server), delay=0)
-
+			
+			S = ServerClass(self.master)
+			activate(S, S.ExecuteJobs(server), delay=0)
 
 			self.ctr += 1
 
