@@ -13,7 +13,9 @@ from SimPy.Simulation import *
 from Tkinter import *
 from datetime import datetime
 from random import seed,Random,expovariate,uniform,normalvariate # https://docs.python.org/2/library/random.html
+from math import exp, log
 import ttk
+import tkMessageBox
 
 
 #----------------------------------------------------------------------#
@@ -26,20 +28,30 @@ import ttk
 class GUI(Tk):
 	def __init__(self, master):
 		Tk.__init__(self, master)
-
 		self.master = master        # reference to parent
+		self.statusText = StringVar()
 		random.seed(datetime.now())
 
 		# create the input frame
 		self.frameIn = Input(self)
-		self.frameIn.grid(row = 0, column = 0, padx = 5, pady =5, ipadx = 5, ipady = 5)
+		#self.frameIn.grid(row = 0, column = 0, padx = 5, pady =5, ipadx = 5, ipady = 5)
+		self.frameIn.pack(side=TOP, anchor=N, fill=BOTH, padx = 5, pady =5, ipadx = 5, ipady = 5)		
 
 		# create the output frame
 		self.frameOut = Output(self)
-		self.frameOut.grid(row = 1, column = 0, padx = 5, pady =5, ipadx = 5, ipady = 5)
+		#self.frameOut.grid(row = 1, column = 0, padx = 5, pady =5, ipadx = 5, ipady = 5)
+		self.frameOut.pack(side=TOP, anchor=N, fill=BOTH, padx = 5, pady =5, ipadx = 5, ipady = 5)
 
 		# bind simulate button
 		self.bind("<<input_simulate>>", self.submit)
+
+		# bind clear button
+		self.bind("<<output_clear>>", self.clearConsole)
+
+		# Status Bar
+		status = Label(self.master, textvariable=self.statusText, bd=1, relief=SUNKEN, anchor=W)
+		#status.grid(row=10, column=0, columnspan=10) # row at very large number, so always at bottom
+		status.pack(side=BOTTOM, anchor=W, fill=X)		
 
 		# initialize console
 		self.makeConsole()
@@ -59,10 +71,13 @@ class GUI(Tk):
 		self.update()
 		self.console.config(state=DISABLED) # disable (non-editable) console
 
-	def clearConsole(self):
-        #       self.console.config(state=NORMAL) # make console editable
+	def clearConsole(self, event):
+		self.console.config(state=NORMAL) # make console editable
 		self.console.delete('1.0', END)
-        #       self.console.config(state=DISABLED) # disable (non-editable) console
+		self.console.config(state=DISABLED) # disable (non-editable) console
+
+	def updateStatusBar(self, text=' '):
+		self.statusText.set(text)
 
 	def printParams(self, arrRate, procRate, percError, splitMech, simLength):
 		self.writeToConsole("\nPARAMETERS:")
@@ -79,10 +94,7 @@ class GUI(Tk):
 		self.writeToConsole('Average processing time, based on generated service times is %s' %ArrivalClass.msT.mean())
 
 	def submit(self, event):
-		#self.frameOut.GetOutputList()
-		#self.clearConsole()
-		self.writeToConsole("--------------------------------------------------------------------------------")
-		self.writeToConsole("Simulation begun")
+		self.updateStatusBar("Simulating...")
 
 		inputInstance = Input(self)
 		resource=Resource(capacity=1, name='Processor')
@@ -90,6 +102,8 @@ class GUI(Tk):
 		self.printParams(inputInstance.valuesList[0], inputInstance.valuesList[1],\
 				 inputInstance.valuesList[2], inputInstance.valuesList[3],\
 				 inputInstance.valuesList[4])
+
+		main.timesClicked = 0
 
 		initialize()
 		A = ArrivalClass(self)
@@ -102,24 +116,8 @@ class GUI(Tk):
 
 		self.DisplayData()
 		
-		self.writeToConsole("\nSimulation complete")
+		self.updateStatusBar("Simulation complete.")
 
-#----------------------------------------------------------------------#
-# Class: NonZeroEntry
-#
-# This class verifies inputs are non-zero.
-#
-#----------------------------------------------------------------------#
-#class NonZeroEntry(Entry):
-#        def __init__(self, master, value="", minValue=None, **kw):
-#		self.minValue = minValue
-#                apply(ValidatingEntry.__init__, (self, master), kw)
-
-#        def validate(self, value):
-#                if self.minValue is None or value > minValue:
-#                        return value
-#                return None # value is zero!
-# http://effbot.org/zone/tkinter-entry-validate.htm
 
 #----------------------------------------------------------------------#
 # Class: Input
@@ -131,8 +129,9 @@ class GUI(Tk):
 class Input(LabelFrame):
 	valuesList = []
 
-	def __init__(self, parent):
-		LabelFrame.__init__(self, parent, text = "Input")
+	def __init__(self, master):
+		LabelFrame.__init__(self, master, text = "Input")
+
 
 		self.arrivalRateInput = DoubleVar()
 		self.processingRateInput = DoubleVar()
@@ -140,7 +139,6 @@ class Input(LabelFrame):
 		self.splittingMechanismInput = IntVar()
 		self.simLengthInput = DoubleVar()
 
-		# create widgets, parent = self because window is parent
 		# Labels
 		labels = [u'\u03bb', u'\u03bc', '% error            ' u"\u00B1", 'splitting mechansim', 'simulation length']
 		r=0
@@ -155,27 +153,23 @@ class Input(LabelFrame):
 		self.entry_3 = Entry(self, textvariable = self.percentErrorInput)
 		self.entry_4 = Entry(self, textvariable = self.splittingMechanismInput)
 		self.entry_5 = Entry(self, textvariable = self.simLengthInput)
-
-		# Simulate Button
-		self.simulateButton = Button(self, text = "SIMULATE", command = self.OnButtonClick)
-
-		self.distributions = ('Select Distribution', 'Exponential', 'Normal', 'Custom')
-
-		#self.comboBox_1 = ttk.Combobox(self, values = self.distributions, state = 'readonly')
-		#self.comboBox_1.current(0) # set selection
-
-		self.comboBox_2 = ttk.Combobox(self, values = self.distributions, state = 'readonly')
-		self.comboBox_2.current(1) # set default selection 					#####################CHANGE LATER
-
 		self.entry_1.grid(row = 0, column = 1)
 		self.entry_2.grid(row = 1, column = 1)
 		self.entry_3.grid(row = 2, column = 1)
 		self.entry_4.grid(row = 3, column = 1)
 		self.entry_5.grid(row = 4, column = 1)
 
-		self.simulateButton.grid(row = 5, columnspan = 2)
+		# Simulate Button
+		self.simulateButton = Button(self, text = "SIMULATE", command = self.OnButtonClick)
+		self.simulateButton.grid(row = 5, columnspan = 3)
 
+		# Distribution Dropdowns
+		self.distributions = ('Select Distribution', 'Exponential', 'Uniform', 'Normal', 'Custom')
+		#self.comboBox_1 = ttk.Combobox(self, values = self.distributions, state = 'readonly')
+		#self.comboBox_1.current(0) # set selection
 		#self.comboBox_1.grid(row = 0, column = 2)
+		self.comboBox_2 = ttk.Combobox(self, values = self.distributions, state = 'readonly')
+		self.comboBox_2.current(1) # set default selection 					#####################CHANGE LATER
 		self.comboBox_2.grid(row = 1, column = 2)
 
 	def OnButtonClick(self):
@@ -193,11 +187,9 @@ class Input(LabelFrame):
 		splittingMechanism = self.splittingMechanismInput.get()
 		maxSimLength = self.simLengthInput.get()
 
-		if arrivalRate <= 0.0: GUI.writeToConsole(self.master, "Arrival rate has to be non-zero!")
-		if processingRate <= 0.0: GUI.writeToConsole(self.master, "Processing rate has to be non-zero!")
-		#if percentError <= 0.0: GUI.writeToConsole(self.master, "Percent error has to be non-zero!")
-		#if splittingMechanism <= 0: GUI.writeToConsole(self.master, "Splitting mechanism has to be non-zero!")
-		if maxSimLength <= 0.0: GUI.writeToConsole(self.master, "Simulation length has to be non-zero!")
+		if arrivalRate <= 0.0: tkMessageBox.showerror("Input Error", "Arrival rate must be non-zero value!")
+		if processingRate <= 0.0: tkMessageBox.showerror("Input Error", "Processing rate must be non-zero value!")
+		if maxSimLength <= 0.0: tkMessageBox.showerror("Input Error", "imulation length must be non-zero value!")
 
 		Input.valuesList = [arrivalRate, processingRate, percentError, splittingMechanism, maxSimLength]
 		return Input.valuesList
@@ -222,81 +214,72 @@ class Input(LabelFrame):
 #
 #----------------------------------------------------------------------#
 class Output(LabelFrame):
-	def __init__(self, parent):
-		LabelFrame.__init__(self, parent, text = "Output")
-
-
-#----------------------------------------------------------------------#
-# Class: ServerClass
-#
-# This class is used to actually model the job processing.
-#
-#----------------------------------------------------------------------#
-class ServerClass(Process):
-	NumJobsInSys = 0
-	CompletedJobs = 0
-	Queue = [] 		# jobs queued for the machines
-
 	def __init__(self, master):
-		Process.__init__(self)
-		self.master = master
+		LabelFrame.__init__(self, master, text = "Output")
 
+		# Clear Button
+		self.clearButton = Button(self, text = "CLEAR", command = self.OnButtonClick)
+		self.clearButton.grid(row = 2, columnspan = 2)
 
-	def ExecuteJobs(self, server):
-		ServerClass.NumJobsInSys += 1
-		ArrivalClass.m.observe(ServerClass.NumJobsInSys)
-		Job = ServerClass.Queue.pop(0)			# job is no longer in queue, now going to be processed
+	def OnButtonClick(self):
+		# clear console
+		self.clearButton.event_generate("<<output_clear>>")
 
-		GUI.writeToConsole(self.master, "%.6f | %s requests service"%(now(), Job.name))
-		yield request,self, server
-		GUI.writeToConsole(self.master, "%.6f | %s server request granted, begin executing"%(now(), Job.name))
-
-		ArrivalClass.msT.observe(Job.procTime)
-		yield hold, self, Job.procTime 
-
-		# job completed, release
-		yield release, self, server
-		GUI.writeToConsole(self.master, "%.6f | %s completed"%(now(), Job.name))
-
-
-		ServerClass.NumJobsInSys -= 1
-		ArrivalClass.m.observe(ServerClass.NumJobsInSys)
-		ArrivalClass.mT.observe(now() - Job.arrivalTime)
-	
-		#GUI.writeToConsole(self.master, "Current number of jobs in the system %s"%JobClass.NumJobsInSys)
-		#GUI.writeToConsole(self.master, "\nQUEUE LENGTH: %d"%len(self.server.queue))
 
 #----------------------------------------------------------------------#
-# Class: JobClass
+# Class: CustomDist
 #
-# This class is used to define jobs.
+# This class is used to allow users to enter a custom distribution.
 #
 #----------------------------------------------------------------------#
-class JobClass(object):
-	def __init__(self):
-		self.arrivalTime = now()
-		self.procTime = 0
+class CustomDist(object):
+	def __init__(self, master):
+		top = self.top = Toplevel(master)
+		self.l=Label(top, text="Please enter the functional inverse of the distribution of your choice. \nExponential distribution is provided as an example. \nNote: x " + u"\u2265" + " 0", font=("Helvetica", 16), anchor=W)
+		self.l.pack(side=TOP)
 
-	# dictionary of service distributions
-	def SetServiceDist(self, procRate, procDist):
-		self.ServiceDistributions =  {
-			'Exponential': random.expovariate(procRate)
-			#'Normal': Rnd.normalvariate(self.ServiceRate)
-			#'Custom':
-		}
-		return self.ServiceDistributions[procDist]
+		self.mu=Button(top, text=u'\u03bc', command=self.insertMu)
+		self.mu.pack(side=LEFT, anchor=NW)
 
-	# generates a percent error for processing time
-	def GenerateError(self, percError):
-		self.percentError = pow(-1, random.randint(0,1)) * (percError * random.random())
-		#GUI.writeToConsole(self.master, "Generated Error: %.4f"%self.percentError)
-		return self.percentError
+		self.u=Button(top, text="u", command=self.insertU)
+		self.u.pack(side=LEFT, anchor=NW)
 
-	def SetJobAttributes(self, procRate, procDist, percError):
-		# generate processing time for the job
-		procTime = self.SetServiceDist(procRate, procDist)
-		errorProcTime = (1 + (self.GenerateError(percError)/100.0))*procTime
-		self.procTime = errorProcTime
+		self.ln=Button(top, text="ln", command=self.insertLn)
+		self.ln.pack(side=LEFT, anchor=NW)
+
+		self.e=Text(top)
+		self.e.insert(END, "-(1/" + u'\u03bc' + ")*ln(u)")
+		self.e.pack(side=TOP, anchor=SW)
+
+		self.b=Button(top,text='Ok',command=self.cleanup)
+		self.b.pack(side=TOP, anchor=S)
+
+
+   	def cleanup(self):
+		self.stringEquation=self.convertFunction()
+		self.top.destroy()
+
+	def insertMu(self):
+		self.e.insert(END, u'\u03bc')
+	def insertU(self):
+		self.e.insert(END, "u")
+	def insertLn(self):
+		self.e.insert(END, "ln")
+
+	def convertFunction(self):
+		self.stringList = list(self.e.get(1.0,END))
+		for i in range(len(self.stringList)):
+			if self.stringList[i] == u'\u03bc':
+				self.stringList[i] = "procRate"
+			elif self.stringList[i] == "u":
+				self.stringList[i] = "random.uniform(0.0, 1.0)"
+			elif self.stringList[i] == "l" and self.stringList[i+1] == "n":
+				self.stringList[i] = "log"
+				self.stringList[i+1] = ""
+		return "".join(self.stringList)
+
+
+		
 
 #----------------------------------------------------------------------#
 # Class: ArrivalClass
@@ -330,9 +313,8 @@ class ArrivalClass(Process):
 		return ArrivalDistributions[arrDist]
 
 	def SortQueue(self, splitMech):
-		#grab the previous m (splitMech) jobs to sort jobs by processing time (procTime) 
-		ServerClass.Queue[-(splitMech+1):] = sorted(ServerClass.Queue[-(splitMech+1):], key=lambda JobClass: JobClass.procTime) 
-		print [job.name + "  " + str(job.procTime) for job in ServerClass.Queue]
+		#grab the previous m (splitMech) jobs to sort jobs by estimated processing time (procTime) 
+		ServerClass.Queue[-(splitMech+1):] = sorted(ServerClass.Queue[-(splitMech+1):], key=lambda JobClass: JobClass.estimatedProcTime) 
 		return ServerClass.Queue
 	
 	def GenerateArrivals(self, arrRate, arrDist, procRate, procDist, percError, splitMech, server):
@@ -340,28 +322,122 @@ class ArrivalClass(Process):
 			# wait for arrival of next job
 			yield hold, self, self.SetArrivalDist(arrRate, arrDist)
 
-			J = JobClass()
+			J = JobClass(self.master)
 			J.SetJobAttributes(procRate, procDist, percError)
 			J.name = "Job%02d"%self.ctr
 			
+
 			ServerClass.Queue.append(J) # add job to queue
+
+			GUI.writeToConsole(self.master, "%.6f | %s arrived"%(now(), J.name))
+			GUI.writeToConsole(self.master, "\nREMAINING QUEUE LENGTH: %d "%len(ServerClass.Queue) + str([job.name for job in ServerClass.Queue]))
+
 			self.SortQueue(splitMech)	    # sort jobs
-			GUI.writeToConsole(self.master, "QUEUE LENGTH: %d"%len(ServerClass.Queue))
+
+
 			
 			S = ServerClass(self.master)
 			activate(S, S.ExecuteJobs(server), delay=0)
 
 			self.ctr += 1
 
-			
-			
+
+#----------------------------------------------------------------------#
+# Class: JobClass
+#
+# This class is used to define jobs.
+#
+#----------------------------------------------------------------------#
+class JobClass(object):
+	def __init__(self, master):
+		self.master = master
+		self.arrivalTime = now()
+		self.procTime = 0
+
+
+	# dictionary of service distributions
+	def SetServiceDist(self, procRate, procDist):
+		self.ServiceDistributions =  {
+			'Exponential': random.expovariate(procRate),
+			'Uniform': random.uniform(0.0, procRate),
+			#'Normal': Rnd.normalvariate(self.ServiceRate)
+			'Custom': self.SetCustomDist(procRate)
+		}
+		return self.ServiceDistributions[procDist]
+
+	def SetCustomDist(self, procRate):
+		if main.timesClicked == 0:
+			main.timesClicked += 1
+        		self.popup=CustomDist(self.master)
+        		self.master.wait_window(self.popup.top)
+			main.customEquation = self.popup.stringEquation
+		return eval(main.customEquation)
+
+	# generates a percent error for processing time
+	def GenerateError(self, percError):
+		self.percentError = pow(-1, random.randint(0,1)) * (percError * random.random())
+		return self.percentError
+
+	def SetJobAttributes(self, procRate, procDist, percError):
+		# generate processing time for the job
+		self.procTime = self.SetServiceDist(procRate, procDist)
+		self.estimatedProcTime = (1 + (self.GenerateError(percError)/100.0))*self.procTime			
+
+
+#----------------------------------------------------------------------#
+# Class: ServerClass
+#
+# This class is used to actually model the job processing.
+#
+#----------------------------------------------------------------------#
+class ServerClass(Process):
+	NumJobsInSys = 0
+	CompletedJobs = 0
+	Queue = [] 		# jobs queued for the machines
+
+	def __init__(self, master):
+		Process.__init__(self)
+		self.master = master
+
+
+	def ExecuteJobs(self, server):
+		ServerClass.NumJobsInSys += 1
+		ArrivalClass.m.observe(ServerClass.NumJobsInSys)
+
+		GUI.writeToConsole(self.master, "%.6f | %s requests service"%(now(), ServerClass.Queue[0].name))
+		yield request,self, server
+		
+		# job is removed from queue, ready to start executing
+		Job = ServerClass.Queue.pop(0)
+		GUI.writeToConsole(self.master, "%.6f | %s server request granted, begin executing"%(now(), Job.name))
+
+		# SHOULD REAL OR ESTIMATED PROC TIME BE OBSERVED HERE???????????????????????????????????????????????????????????????????????????
+		ArrivalClass.msT.observe(Job.procTime)
+		yield hold, self, Job.procTime # process job according to REAL processing time
+
+		# job completed, release
+		yield release, self, server
+		GUI.writeToConsole(self.master, "%.6f | %s completed"%(now(), Job.name))		
+
+		ServerClass.NumJobsInSys -= 1
+		ArrivalClass.m.observe(ServerClass.NumJobsInSys)
+		ArrivalClass.mT.observe(now() - Job.arrivalTime)
+
+		#GUI.writeToConsole(self.master, "Current number of jobs in the system %s"%JobClass.NumJobsInSys)
+		#GUI.writeToConsole(self.master, "\nQUEUE LENGTH: %d"%len(self.server.queue))
+
 
 
 
 #----------------------------------------------------------------------#
 def main():
-	window = GUI(None)                          # instantiate the class with no parent (None)
+	window = GUI(None)                          	# instantiate the class with no parent (None)
 	window.title('Single Server SRPT with Errors')  # title the window
+
+	#global variables used in JobClass
+	main.timesClicked = 0		
+	main.customEquation = ""
+
 	#window.geometry("500x600")                     # set window size
 	window.mainloop()                               # loop indefinitely, wait for events
 
