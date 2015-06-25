@@ -35,12 +35,12 @@ class GUI(Tk):
 		# create the input frame
 		self.frameIn = Input(self)
 		#self.frameIn.grid(row = 0, column = 0, padx = 5, pady =5, ipadx = 5, ipady = 5)
-		self.frameIn.pack(side=TOP, anchor=N, fill=BOTH, padx = 5, pady =5, ipadx = 5, ipady = 5)		
+		self.frameIn.pack(side=TOP, fill=BOTH, padx = 5, pady =5, ipadx = 5, ipady = 5)		
 
 		# create the output frame
 		self.frameOut = Output(self)
 		#self.frameOut.grid(row = 1, column = 0, padx = 5, pady =5, ipadx = 5, ipady = 5)
-		self.frameOut.pack(side=TOP, anchor=N, fill=BOTH, padx = 5, pady =5, ipadx = 5, ipady = 5)
+		self.frameOut.pack(side=TOP, fill=BOTH, padx = 5, pady =5, ipadx = 5, ipady = 5)
 
 		# bind simulate button
 		self.bind("<<input_simulate>>", self.submit)
@@ -131,13 +131,15 @@ class Input(LabelFrame):
 
 	def __init__(self, master):
 		LabelFrame.__init__(self, master, text = "Input")
-
-
+		self.master = master
 		self.arrivalRateInput = DoubleVar()
 		self.processingRateInput = DoubleVar()
 		self.percentErrorInput = DoubleVar()
 		self.splittingMechanismInput = IntVar()
 		self.simLengthInput = DoubleVar()
+
+		self.grid_columnconfigure(0, weight=1)
+		self.grid_rowconfigure(0, weight=1)
 
 		# Labels
 		labels = [u'\u03bb', u'\u03bc', '% error            ' u"\u00B1", 'splitting mechansim', 'simulation length']
@@ -159,18 +161,21 @@ class Input(LabelFrame):
 		self.entry_4.grid(row = 3, column = 1)
 		self.entry_5.grid(row = 4, column = 1)
 
+
+
 		# Simulate Button
 		self.simulateButton = Button(self, text = "SIMULATE", command = self.OnButtonClick)
 		self.simulateButton.grid(row = 5, columnspan = 3)
 
 		# Distribution Dropdowns
-		self.distributions = ('Select Distribution', 'Exponential', 'Uniform', 'Normal', 'Custom')
+		self.distributions = ('Select Distribution', 'Exponential', 'Uniform', 'Custom')
 		#self.comboBox_1 = ttk.Combobox(self, values = self.distributions, state = 'readonly')
 		#self.comboBox_1.current(0) # set selection
 		#self.comboBox_1.grid(row = 0, column = 2)
 		self.comboBox_2 = ttk.Combobox(self, values = self.distributions, state = 'readonly')
 		self.comboBox_2.current(1) # set default selection 					#####################CHANGE LATER
 		self.comboBox_2.grid(row = 1, column = 2)
+
 
 	def OnButtonClick(self):
 		self.GetNumericValues()
@@ -216,6 +221,8 @@ class Input(LabelFrame):
 class Output(LabelFrame):
 	def __init__(self, master):
 		LabelFrame.__init__(self, master, text = "Output")
+		self.grid_columnconfigure(0, weight=1)
+		self.grid_rowconfigure(0, weight=1)
 
 		# Clear Button
 		self.clearButton = Button(self, text = "CLEAR", command = self.OnButtonClick)
@@ -235,24 +242,40 @@ class Output(LabelFrame):
 class CustomDist(object):
 	def __init__(self, master):
 		top = self.top = Toplevel(master)
-		self.l=Label(top, text="Please enter the functional inverse of the distribution of your choice. \nExponential distribution is provided as an example. \nNote: x " + u"\u2265" + " 0", font=("Helvetica", 16), anchor=W)
-		self.l.pack(side=TOP)
+		top.geometry("500x200")                     # set window size
+		top.resizable(0,0)
 
-		self.mu=Button(top, text=u'\u03bc', command=self.insertMu)
-		self.mu.pack(side=LEFT, anchor=NW)
+		self.function = StringVar()
 
-		self.u=Button(top, text="u", command=self.insertU)
-		self.u.pack(side=LEFT, anchor=NW)
+		# Label frame
+		frame1 = Frame(top)
+		frame1.pack(side=TOP, padx=5, pady=5)
+		self.l=Label(frame1, text="Please enter the functional inverse of the distribution of your choice. \nExponential distribution is provided as an example. \nNote: x " + u"\u2265" + " 0", font=("Helvetica", 12), justify=LEFT)
+		self.l.pack()
 
-		self.ln=Button(top, text="ln", command=self.insertLn)
-		self.ln.pack(side=LEFT, anchor=NW)
+		#Button frame
+		frame2 = Frame(top)
+		frame2.pack(side=TOP, padx=5, pady=5)
+		self.mu=Button(frame2, text=u'\u03bc', command=self.insertMu)
+		self.mu.pack(side=LEFT)
 
-		self.e=Text(top)
-		self.e.insert(END, "-(1/" + u'\u03bc' + ")*ln(u)")
-		self.e.pack(side=TOP, anchor=SW)
+		self.u=Button(frame2, text="u", command=self.insertU)
+		self.u.pack(side=LEFT)
 
-		self.b=Button(top,text='Ok',command=self.cleanup)
-		self.b.pack(side=TOP, anchor=S)
+		self.ln=Button(frame2, text="ln", command=self.insertLn)
+		self.ln.pack(side=LEFT)
+
+		# Input frame
+		frame3 = Frame(top)
+		frame3.pack(side=TOP, padx=5, pady=5)
+		self.e = Entry(frame3, textvariable = self.function)
+		self.e.insert(0, "-(1/" + u'\u03bc' + ")*ln(u)")
+		self.e.pack(fill="both", expand=True)
+
+		frame4 = Frame(top)
+		frame4.pack(side=TOP, pady=10)
+		self.b=Button(frame4,text='Ok',command=self.cleanup)
+		self.b.pack()
 
 
    	def cleanup(self):
@@ -267,7 +290,7 @@ class CustomDist(object):
 		self.e.insert(END, "ln")
 
 	def convertFunction(self):
-		self.stringList = list(self.e.get(1.0,END))
+		self.stringList = list(self.e.get())
 		for i in range(len(self.stringList)):
 			if self.stringList[i] == u'\u03bc':
 				self.stringList[i] = "procRate"
@@ -277,8 +300,6 @@ class CustomDist(object):
 				self.stringList[i] = "log"
 				self.stringList[i+1] = ""
 		return "".join(self.stringList)
-
-
 		
 
 #----------------------------------------------------------------------#
@@ -326,16 +347,15 @@ class ArrivalClass(Process):
 			J.SetJobAttributes(procRate, procDist, percError)
 			J.name = "Job%02d"%self.ctr
 			
-
-			ServerClass.Queue.append(J) # add job to queue
+			# add job to queue
+			ServerClass.Queue.append(J)
 
 			GUI.writeToConsole(self.master, "%.6f | %s arrived"%(now(), J.name))
 			GUI.writeToConsole(self.master, "\nREMAINING QUEUE LENGTH: %d "%len(ServerClass.Queue) + str([job.name for job in ServerClass.Queue]))
 
-			self.SortQueue(splitMech)	    # sort jobs
+			# sort jobs
+			self.SortQueue(splitMech)
 
-
-			
 			S = ServerClass(self.master)
 			activate(S, S.ExecuteJobs(server), delay=0)
 
@@ -354,7 +374,6 @@ class JobClass(object):
 		self.arrivalTime = now()
 		self.procTime = 0
 
-
 	# dictionary of service distributions
 	def SetServiceDist(self, procRate, procDist):
 		self.ServiceDistributions =  {
@@ -363,6 +382,7 @@ class JobClass(object):
 			#'Normal': Rnd.normalvariate(self.ServiceRate)
 			'Custom': self.SetCustomDist(procRate)
 		}
+		print self.ServiceDistributions[procDist]
 		return self.ServiceDistributions[procDist]
 
 	def SetCustomDist(self, procRate):
@@ -399,11 +419,11 @@ class ServerClass(Process):
 		Process.__init__(self)
 		self.master = master
 
-
 	def ExecuteJobs(self, server):
 		ServerClass.NumJobsInSys += 1
 		ArrivalClass.m.observe(ServerClass.NumJobsInSys)
 
+		# first job in queue requests service
 		GUI.writeToConsole(self.master, "%.6f | %s requests service"%(now(), ServerClass.Queue[0].name))
 		yield request,self, server
 		
