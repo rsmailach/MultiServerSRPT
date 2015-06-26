@@ -80,7 +80,7 @@ class GUI(Tk):
 		self.statusText.set(text)
 
 	def printParams(self, arrRate, procRate, percError, splitMech, simLength):
-		self.writeToConsole("--------------------------------------------------------------------------------")
+		self.writeToConsole("-------------------------------------------------------------------------------")
 		self.writeToConsole("PARAMETERS:")
 		self.writeToConsole("Arrival Rate = %.4f"%arrRate)
 		self.writeToConsole("Processing Rate = %.4f"%procRate)
@@ -92,7 +92,7 @@ class GUI(Tk):
 		self.writeToConsole('\n\nSINGLE SERVER SRPT')
 		self.writeToConsole('Average number of jobs in the system at any given time %s' %ArrivalClass.m.timeAverage())
 		self.writeToConsole('Average time in system, from start to completion is %s' %ArrivalClass.mT.mean())
-		self.writeToConsole('Average processing time, based on generated service times is %s' %ArrivalClass.msT.mean())
+		self.writeToConsole('Average processing time, based on generated service times is %s\n\n\n' %ArrivalClass.msT.mean())
 
 	def submit(self, event):
 		self.updateStatusBar("Simulating...")
