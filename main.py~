@@ -80,7 +80,7 @@ class GUI(Tk):
 		self.statusText.set(text)
 
 	def printParams(self, arrRate, procRate, percError, splitMech, simLength):
-		self.writeToConsole("-------------------------------------------------------------------------------")
+		self.writeToConsole("--------------------------------------------------------------------------------")
 		self.writeToConsole("PARAMETERS:")
 		self.writeToConsole("Arrival Rate = %.4f"%arrRate)
 		self.writeToConsole("Processing Rate = %.4f"%procRate)
