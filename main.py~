@@ -80,15 +80,16 @@ class GUI(Tk):
 		self.statusText.set(text)
 
 	def printParams(self, arrRate, procRate, percError, splitMech, simLength):
-		self.writeToConsole("\nPARAMETERS:")
+		self.writeToConsole("--------------------------------------------------------------------------------")
+		self.writeToConsole("PARAMETERS:")
 		self.writeToConsole("Arrival Rate = %.4f"%arrRate)
 		self.writeToConsole("Processing Rate = %.4f"%procRate)
 		self.writeToConsole("% Error  = " + u"\u00B1" + " %.4f"%percError)
 		self.writeToConsole("Splitting mechanism = %d"%splitMech)
-		self.writeToConsole("Simulation Length = %.4f\n"%simLength)
+		self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
 
 	def DisplayData(self):
-		self.writeToConsole('\nSINGLE SERVER SRPT')
+		self.writeToConsole('\n\nSINGLE SERVER SRPT')
 		self.writeToConsole('Average number of jobs in the system at any given time %s' %ArrivalClass.m.timeAverage())
 		self.writeToConsole('Average time in system, from start to completion is %s' %ArrivalClass.mT.mean())
 		self.writeToConsole('Average processing time, based on generated service times is %s' %ArrivalClass.msT.mean())
@@ -377,13 +378,18 @@ class JobClass(object):
 	# dictionary of service distributions
 	def SetServiceDist(self, procRate, procDist):
 		self.ServiceDistributions =  {
-			'Exponential': random.expovariate(procRate),
-			'Uniform': random.uniform(0.0, procRate),
+			'Exponential': self.SetExponDist,
+			'Uniform': self.SetUniformDist,
 			#'Normal': Rnd.normalvariate(self.ServiceRate)
-			'Custom': self.SetCustomDist(procRate)
+			'Custom': self.SetCustomDist
 		}
-		print self.ServiceDistributions[procDist]
-		return self.ServiceDistributions[procDist]
+		return self.ServiceDistributions[procDist](procRate)
+
+	def SetExponDist(self, procRate):
+		return random.expovariate(procRate)
+
+	def SetUniformDist(self, procRate):
+		return random.uniform(0.0, procRate)
 
 	def SetCustomDist(self, procRate):
 		if main.timesClicked == 0:
@@ -392,6 +398,8 @@ class JobClass(object):
         		self.master.wait_window(self.popup.top)
 			main.customEquation = self.popup.stringEquation
 		return eval(main.customEquation)
+
+
 
 	# generates a percent error for processing time
 	def GenerateError(self, percError):
