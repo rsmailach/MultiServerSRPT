@@ -109,8 +109,10 @@ class GUI(Tk):
 		self.writeToConsole('Average processing time, based on generated service times is %s\n\n\n' %ArrivalClass.msT.mean())
 
 	def disableTabs(self, tabList):
-		if tabList[0] == 0:
-			self.notebook.page1.config(state='disabled')
+		for i in range(len(tabList)):
+			print i
+			if tabList[i] == 0:
+				self.notebook.tab(i, state="hidden")
 				
 		
 
@@ -200,9 +202,12 @@ class Input(LabelFrame):
 
 		# Simulation checkboxes
 		self.selectSims = Label(self, text="Please select the simulations you would like to run:").grid(row=5, columnspan=3, sticky=W)
-		self.check1 = Checkbutton(self, text="Approx. SRPT with Errors", variable=self.approxSRPTE).grid(row=6, column=0, sticky=W)
-		self.check2 = Checkbutton(self, text="SRPT with Errors", variable=self.SRPTE).grid(row=6, column=1, sticky=W)
-		self.check3 = Checkbutton(self, text="PSBS", variable=self.PSBS).grid(row=6, column=2, sticky=W)
+		self.check1 = Checkbutton(self, text="Approx. SRPT with Errors", variable=self.approxSRPTE)
+		self.check2 = Checkbutton(self, text="SRPT with Errors", variable=self.SRPTE)
+		self.check3 = Checkbutton(self, text="PSBS", variable=self.PSBS)
+		self.check1.grid(row=6, column=0, sticky=W)
+		self.check2.grid(row=6, column=1, sticky=W)
+		self.check3.grid(row=6, column=2, sticky=W)
 
 		# Simulate Button
 		self.simulateButton = Button(self, text = "SIMULATE", command = self.OnButtonClick)
@@ -237,8 +242,9 @@ class Input(LabelFrame):
 		Input.distList = ["", self.comboBox_2.get(), "", "", ""]
 		return Input.distList
 
+	# gets 0 or 1 value for checkboxes
 	def GetCheckboxValues(self):
-		Input.simList = [self.check1.get(), self.check2.get(), self.check3.get()] ############################ERRORING...
+		Input.simList = [self.approxSRPTE.get(), self.SRPTE.get(), self.PSBS.get()]
 		return Input.simList
 
 #----------------------------------------------------------------------#
