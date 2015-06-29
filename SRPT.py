@@ -10,12 +10,12 @@
 
 from SimPy.Simulation import *
 from Tkinter import *
-import ttk
 from datetime import datetime
 from random import seed,Random,expovariate,uniform,normalvariate # https://docs.python.org/2/library/random.html
 from math import exp, log
 import tkMessageBox
-
+import ttk
+import tkFileDialog
 
 #----------------------------------------------------------------------#
 # Class: GUI
@@ -54,9 +54,9 @@ class GUI(Tk):
 
 		#Create a notebook, with Output frame as it's parent
 		self.notebook = ttk.Notebook(self.frameOut)
-		self.page1 = Frame(self.notebook)
-		self.page2 = Frame(self.notebook)
-		self.page3 = Frame(self.notebook)
+		self.page1 = Frame(self.notebook, name="page1")
+		self.page2 = Frame(self.notebook, name="page2")
+		self.page3 = Frame(self.notebook, name="page3")
 		self.notebook.add(self.page1, text = "Approx. SRPT with Errors")
 		self.notebook.add(self.page2, text = "Actual SRPT with Errors")
 		self.notebook.add(self.page3, text = "PSBS")
@@ -66,6 +66,7 @@ class GUI(Tk):
 		self.makeConsole(self.page1)
 		self.makeConsole(self.page2)
 		self.makeConsole(self.page3)
+
 
 	def makeConsole(self, tab):
 		self.console = Text(tab, wrap = WORD)
@@ -83,7 +84,18 @@ class GUI(Tk):
 		self.console.config(state=DISABLED) # disable (non-editable) console
 
 	def saveData(self, event):
-		print "Your data isn't really saved, I'm lying"
+		# get filename
+		filename = tkFileDialog.asksaveasfilename(title="Save as...", defaultextension='.txt')
+		
+		if filename:
+			file = open(filename, mode='w')
+			data = self.console.get(1.0, END)
+			encodedData = data.encode('utf-8')
+			text = str(encodedData)
+		
+			
+			file.write(text)
+			file.close()
 
 	def clearConsole(self, event):
 		self.console.config(state=NORMAL) # make console editable
@@ -94,13 +106,20 @@ class GUI(Tk):
 		self.statusText.set(text)
 
 	def printParams(self, arrRate, procRate, percError, splitMech, simLength):
-		self.writeToConsole("--------------------------------------------------------------------------------")
-		self.writeToConsole("PARAMETERS:")
-		self.writeToConsole("Arrival Rate = %.4f"%arrRate)
-		self.writeToConsole("Processing Rate = %.4f"%procRate)
-		self.writeToConsole("% Error  = " + u"\u00B1" + " %.4f"%percError)
-		self.writeToConsole("Splitting mechanism = %d"%splitMech)
-		self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
+		parentName = self.console.winfo_parent()
+		#parent = Widget._nametowidget(parent)
+		print "parent name: " + parentName
+		
+		for i in range(self.notebook.index("end")):
+			tab = i
+			self.writeToConsole("--------------------------------------------------------------------------------")
+			self.writeToConsole("PARAMETERS:")
+			self.writeToConsole("Arrival Rate = %.4f"%arrRate)
+			self.writeToConsole("Processing Rate = %.4f"%procRate)
+			self.writeToConsole("% Error  = " + u"\u00B1" + " %.4f"%percError)
+			if tab == 0:
+				self.writeToConsole("Splitting mechanism = %d"%splitMech)
+			self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
 
 	def DisplayData(self):
 		self.writeToConsole('\n\nSINGLE SERVER SRPT')
@@ -110,7 +129,6 @@ class GUI(Tk):
 
 	def disableTabs(self, tabList):
 		for i in range(len(tabList)):
-			print i
 			if tabList[i] == 0:
 				self.notebook.tab(i, state="hidden")
 				
@@ -166,6 +184,9 @@ class Input(LabelFrame):
 		self.approxSRPTE = IntVar()
 		self.SRPTE = IntVar()
 		self.PSBS = IntVar()
+		self.approxSRPTE.set(1)
+		self.SRPTE.set(1)
+		self.PSBS.set(1)
 
 		self.grid_columnconfigure(0, weight=1)
 		self.grid_rowconfigure(0, weight=1)
