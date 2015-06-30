@@ -16,6 +16,8 @@ from math import exp, log
 import tkMessageBox
 import ttk
 import tkFileDialog
+import csv
+import operator
 
 #----------------------------------------------------------------------#
 # Class: GUI
@@ -122,7 +124,7 @@ class GUI(Tk):
 		self.clearQueueFile()
 
 		inputInstance = Input(self)
-		resource=Resource(capacity=1, name='Processor')
+		resource=Resource(capacity=1, name='Processor', preemptable=True)
 
 		self.printParams(inputInstance.valuesList[0], inputInstance.valuesList[1],\
 				 inputInstance.valuesList[2], inputInstance.valuesList[3])
@@ -371,12 +373,25 @@ class ArrivalClass(Process):
 		return ArrivalDistributions[arrDist]
 
 	def AddJobToFile(self, job):
-		text = str([job.name, job.arrivalTime, job.procTime, job.estimatedProcTime]) + "\n"
+		text = str(job.name) + "," + str(job.arrivalTime) + "," + str(job.procTime) + "," + str(job.estimatedProcTime) + "\n"
+		
 		with open("SRPTE_Queue.txt", "a") as myFile:
 			myFile.write(text)
 			myFile.close()
 
-	
+	def SortQueueFile(self):
+		with open("SRPTE_Queue.txt", "r") as myFile:
+			csv1 = csv.reader(myFile, delimiter=',')
+			sort = sorted(csv1, key=operator.itemgetter(3)) #sort by 4th column (starts at 0)
+			myFile.close()
+
+		with open("SRPTE_Queue.txt", "w") as myFile:
+			for eachline in sort:
+				line = ','.join(eachline)		# convert each row to correct format
+				myFile.write(line + '\n')
+			myFile.close()
+
+
 	def GenerateArrivals(self, arrRate, arrDist, procRate, procDist, percError, server):
 		while 1:
 			# wait for arrival of next job
@@ -388,11 +403,12 @@ class ArrivalClass(Process):
 			
 			# add job to queue
 			self.AddJobToFile(J)
-			ServerClass.Queue.append(J)
+			#ServerClass.Queue.append(J)
 
 			GUI.writeToConsole(self.master, "%.6f | %s arrived"%(now(), J.name))
-			GUI.writeToConsole(self.master, "\nREMAINING QUEUE LENGTH: %d "%len(ServerClass.Queue) + str([job.name for job in ServerClass.Queue]))
-
+			#GUI.writeToConsole(self.master, "\nREMAINING QUEUE LENGTH: %d "%len(ServerClass.Queue) + str([job.name for job in ServerClass.Queue]))
+			# sort queue
+			self.SortQueueFile()
 
 			S = ServerClass(self.master)
 			activate(S, S.ExecuteJobs(server), delay=0)
@@ -458,22 +474,44 @@ class JobClass(object):
 class ServerClass(Process):
 	NumJobsInSys = 0
 	CompletedJobs = 0
-	Queue = [] 		# jobs queued for the machines
 
 	def __init__(self, master):
 		Process.__init__(self)
 		self.master = master
+
+	def GetFirstJobQueued(self):
+		with open('SRPTE_Queue.txt', 'r') as myFile:
+			reader = csv.reader(myFile)
+			firstRow = next(reader)
+
+			myFile.close()
+
+		job = JobClass(self.master)
+
+		job.name = str(firstRow[0])
+		job.arrivalTime = float(firstRow[1])
+		job.procTime = float(firstRow[2])
+		job.estimatedProcTime = float(firstRow[3])
+		return job
+
+	def RemoveFirstJobQueued(self):
+		with open('SRPTE_Queue.txt', 'r') as fin:
+    			data = fin.read().splitlines(True)
+			fin.close()
+		with open('SRPTE_Queue.txt', 'w') as fout:
+   			fout.writelines(data[1:])
+			fout.close()
 
 	def ExecuteJobs(self, server):
 		ServerClass.NumJobsInSys += 1
 		ArrivalClass.m.observe(ServerClass.NumJobsInSys)
 
 		# first job in queue requests service
-		GUI.writeToConsole(self.master, "%.6f | %s requests service"%(now(), ServerClass.Queue[0].name))
-		yield request,self, server
+		Job = self.GetFirstJobQueued()
+		GUI.writeToConsole(self.master, "%.6f | %s requests service"%(now(), Job.name))
+		yield request, self, server
 		
-		# job is removed from queue, ready to start executing
-		Job = ServerClass.Queue.pop(0)
+		# job is ready to start executing
 		GUI.writeToConsole(self.master, "%.6f | %s server request granted, begin executing"%(now(), Job.name))
 
 		# SHOULD REAL OR ESTIMATED PROC TIME BE OBSERVED HERE???????????????????????????????????????????????????????????????????????????
@@ -482,7 +520,10 @@ class ServerClass(Process):
 
 		# job completed, release
 		yield release, self, server
-		GUI.writeToConsole(self.master, "%.6f | %s completed"%(now(), Job.name))		
+		GUI.writeToConsole(self.master, "%.6f | %s completed"%(now(), Job.name))
+
+		#if (timeProcessed - procTime) == 0: #############################IF remaining PROCTIME = 0
+			self.RemoveFirstJobQueued() #############################IF PROCTIME = 0		
 
 		ServerClass.NumJobsInSys -= 1
 		ArrivalClass.m.observe(ServerClass.NumJobsInSys)
