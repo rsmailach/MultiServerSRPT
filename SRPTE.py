@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------#
-# SRPT.py
+# SRPTE.py
 #
 # This application simulates a single server with Poisson arrivals
 # and processing times of a general distribution. There are errors in
@@ -52,36 +52,25 @@ class GUI(Tk):
 		status = Label(self.master, textvariable=self.statusText, bd=1, relief=SUNKEN, anchor=W)
 		status.pack(side=BOTTOM, anchor=W, fill=X)		
 
-		#Create a notebook, with Output frame as it's parent
-		self.notebook = ttk.Notebook(self.frameOut)
-		self.page1 = Frame(self.notebook, name="page1")
-		self.page2 = Frame(self.notebook, name="page2")
-		self.page3 = Frame(self.notebook, name="page3")
-		self.notebook.add(self.page1, text = "Approx. SRPT with Errors")
-		self.notebook.add(self.page2, text = "Actual SRPT with Errors")
-		self.notebook.add(self.page3, text = "PSBS")
-		self.notebook.grid(column=0, row=0)
-
 		# initialize console
-		self.makeConsole(self.page1)
-		self.makeConsole(self.page2)
-		self.makeConsole(self.page3)
+		self.makeConsole()
+		self.printIntro()
 
 
-	def makeConsole(self, tab):
-		self.console = Text(tab, wrap = WORD)
+	def makeConsole(self):
+		self.console = Text(self.frameOut, wrap = WORD)
 		self.console.config(state=DISABLED) # start with console as disabled (non-editable)
-		scrollbar = Scrollbar(tab)
+		scrollbar = Scrollbar(self.frameOut)
 		scrollbar.config(command = self.console.yview)
 		self.console.config(yscrollcommand=scrollbar.set)
 		self.console.grid(column=0, row=0)
 		scrollbar.grid(column=1, row=0, sticky='NS')
 
 	def writeToConsole(self, text = ' '):
-		self.console.config(state=NORMAL) # make console editable
-		self.console.insert(END, '%s\n'%text)
+		consoleWidget.config(state=NORMAL) # make console editable
+		consoleWidget.insert(END, '%s\n'%text)
 		self.update()
-		self.console.config(state=DISABLED) # disable (non-editable) console
+		consoleWidget.config(state=DISABLED) # disable (non-editable) console
 
 	def saveData(self, event):
 		# get filename
@@ -104,36 +93,24 @@ class GUI(Tk):
 
 	def updateStatusBar(self, text=' '):
 		self.statusText.set(text)
+	
+	def printIntro(self):
+		self.writeToConsole("SRPTE \nThis application simulates a single server with Poisson arrivals and processing times of a general distribution. Each arrival has an estimation error within a percent error taken as input.")
 
-	def printParams(self, arrRate, procRate, percError, splitMech, simLength):
-		parentName = self.console.winfo_parent()
-		#parent = Widget._nametowidget(parent)
-		print "parent name: " + parentName
-		
-		for i in range(self.notebook.index("end")):
-			tab = i
-			self.writeToConsole("--------------------------------------------------------------------------------")
-			self.writeToConsole("PARAMETERS:")
-			self.writeToConsole("Arrival Rate = %.4f"%arrRate)
-			self.writeToConsole("Processing Rate = %.4f"%procRate)
-			self.writeToConsole("% Error  = " + u"\u00B1" + " %.4f"%percError)
-			if tab == 0:
-				self.writeToConsole("Splitting mechanism = %d"%splitMech)
-			self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
+	def printParams(self, arrRate, procRate, percError, simLength):	
+		self.writeToConsole("--------------------------------------------------------------------------------")
+		self.writeToConsole("PARAMETERS:")
+		self.writeToConsole("Arrival Rate = %.4f"%arrRate)
+		self.writeToConsole("Processing Rate = %.4f"%procRate)
+		self.writeToConsole("% Error  = " + u"\u00B1" + " %.4f"%percError)
+		self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
 
-	def DisplayData(self):
+	def DisplayData(self):			
 		self.writeToConsole('\n\nSINGLE SERVER SRPT')
 		self.writeToConsole('Average number of jobs in the system at any given time %s' %ArrivalClass.m.timeAverage())
 		self.writeToConsole('Average time in system, from start to completion is %s' %ArrivalClass.mT.mean())
 		self.writeToConsole('Average processing time, based on generated service times is %s\n\n\n' %ArrivalClass.msT.mean())
-
-	def disableTabs(self, tabList):
-		for i in range(len(tabList)):
-			if tabList[i] == 0:
-				self.notebook.tab(i, state="hidden")
 				
-		
-
 	def submit(self, event):
 		self.updateStatusBar("Simulating...")
 
@@ -178,7 +155,6 @@ class Input(LabelFrame):
 		self.arrivalRateInput = DoubleVar()
 		self.processingRateInput = DoubleVar()
 		self.percentErrorInput = DoubleVar()
-		self.splittingMechanismInput = IntVar()
 		self.simLengthInput = DoubleVar()
 
 		self.approxSRPTE = IntVar()
@@ -192,7 +168,7 @@ class Input(LabelFrame):
 		self.grid_rowconfigure(0, weight=1)
 
 		# Labels
-		labels = [u'\u03bb', u'\u03bc', '% error            ' u"\u00B1", 'splitting mechansim', 'simulation length']
+		labels = [u'\u03bb', u'\u03bc', '% error            ' u"\u00B1", 'simulation length']
 		r=0
 		c=0
 		for elem in labels:
@@ -203,13 +179,11 @@ class Input(LabelFrame):
 		self.entry_1 = Entry(self, textvariable = self.arrivalRateInput)
 		self.entry_2 = Entry(self, textvariable = self.processingRateInput)
 		self.entry_3 = Entry(self, textvariable = self.percentErrorInput)
-		self.entry_4 = Entry(self, textvariable = self.splittingMechanismInput)
-		self.entry_5 = Entry(self, textvariable = self.simLengthInput)
+		self.entry_4 = Entry(self, textvariable = self.simLengthInput)
 		self.entry_1.grid(row = 0, column = 1)
 		self.entry_2.grid(row = 1, column = 1)
 		self.entry_3.grid(row = 2, column = 1)
 		self.entry_4.grid(row = 3, column = 1)
-		self.entry_5.grid(row = 4, column = 1)
 
 
 		# Distribution Dropdowns
@@ -220,15 +194,6 @@ class Input(LabelFrame):
 		self.comboBox_2 = ttk.Combobox(self, values = self.distributions, state = 'readonly')
 		self.comboBox_2.current(1) # set default selection 					#####################CHANGE LATER
 		self.comboBox_2.grid(row = 1, column = 2)
-
-		# Simulation checkboxes
-		self.selectSims = Label(self, text="Please select the simulations you would like to run:").grid(row=5, columnspan=3, sticky=W)
-		self.check1 = Checkbutton(self, text="Approx. SRPT with Errors", variable=self.approxSRPTE)
-		self.check2 = Checkbutton(self, text="SRPT with Errors", variable=self.SRPTE)
-		self.check3 = Checkbutton(self, text="PSBS", variable=self.PSBS)
-		self.check1.grid(row=6, column=0, sticky=W)
-		self.check2.grid(row=6, column=1, sticky=W)
-		self.check3.grid(row=6, column=2, sticky=W)
 
 		# Simulate Button
 		self.simulateButton = Button(self, text = "SIMULATE", command = self.OnButtonClick)
@@ -246,14 +211,13 @@ class Input(LabelFrame):
 		arrivalRate = self.arrivalRateInput.get()
 		processingRate = self.processingRateInput.get()
 		percentError = self.percentErrorInput.get()
-		splittingMechanism = self.splittingMechanismInput.get()
 		maxSimLength = self.simLengthInput.get()
 
 		if arrivalRate <= 0.0: tkMessageBox.showerror("Input Error", "Arrival rate must be non-zero value!")
 		if processingRate <= 0.0: tkMessageBox.showerror("Input Error", "Processing rate must be non-zero value!")
 		if maxSimLength <= 0.0: tkMessageBox.showerror("Input Error", "imulation length must be non-zero value!")
 
-		Input.valuesList = [arrivalRate, processingRate, percentError, splittingMechanism, maxSimLength]
+		Input.valuesList = [arrivalRate, processingRate, percentError, maxSimLength]
 		return Input.valuesList
 
 	def GetDropDownValues(self):
@@ -398,12 +362,8 @@ class ArrivalClass(Process):
 		}
 		return ArrivalDistributions[arrDist]
 
-	def SortQueue(self, splitMech):
-		#grab the previous m (splitMech) jobs to sort jobs by estimated processing time (procTime) 
-		ServerClass.Queue[-(splitMech+1):] = sorted(ServerClass.Queue[-(splitMech+1):], key=lambda JobClass: JobClass.estimatedProcTime) 
-		return ServerClass.Queue
 	
-	def GenerateArrivals(self, arrRate, arrDist, procRate, procDist, percError, splitMech, server):
+	def GenerateArrivals(self, arrRate, arrDist, procRate, procDist, percError, server):
 		while 1:
 			# wait for arrival of next job
 			yield hold, self, self.SetArrivalDist(arrRate, arrDist)
@@ -415,11 +375,9 @@ class ArrivalClass(Process):
 			# add job to queue
 			ServerClass.Queue.append(J)
 
-			GUI.writeToConsole(self.master, "%.6f | %s arrived"%(now(), J.name))
+			GUI.writeToConsole(self.master "%.6f | %s arrived"%(now(), J.name))
 			GUI.writeToConsole(self.master, "\nREMAINING QUEUE LENGTH: %d "%len(ServerClass.Queue) + str([job.name for job in ServerClass.Queue]))
 
-			# sort jobs
-			self.SortQueue(splitMech)
 
 			S = ServerClass(self.master)
 			activate(S, S.ExecuteJobs(server), delay=0)
@@ -490,13 +448,14 @@ class ServerClass(Process):
 	def __init__(self, master):
 		Process.__init__(self)
 		self.master = master
+		guiInstance = GUI(self)
 
 	def ExecuteJobs(self, server):
 		ServerClass.NumJobsInSys += 1
 		ArrivalClass.m.observe(ServerClass.NumJobsInSys)
 
 		# first job in queue requests service
-		GUI.writeToConsole(self.master, "%.6f | %s requests service"%(now(), ServerClass.Queue[0].name))
+		GUI.writeToConsole(self.master "%.6f | %s requests service"%(now(), ServerClass.Queue[0].name))
 		yield request,self, server
 		
 		# job is removed from queue, ready to start executing
@@ -515,8 +474,6 @@ class ServerClass(Process):
 		ArrivalClass.m.observe(ServerClass.NumJobsInSys)
 		ArrivalClass.mT.observe(now() - Job.arrivalTime)
 
-		#GUI.writeToConsole(self.master, "Current number of jobs in the system %s"%JobClass.NumJobsInSys)
-		#GUI.writeToConsole(self.master, "\nQUEUE LENGTH: %d"%len(self.server.queue))
 
 
 

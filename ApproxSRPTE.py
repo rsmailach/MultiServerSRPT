@@ -16,6 +16,7 @@ from random import seed,Random,expovariate,uniform,normalvariate # https://docs.
 from math import exp, log
 import ttk
 import tkMessageBox
+import tkFileDialog
 
 
 #----------------------------------------------------------------------#
@@ -45,6 +46,9 @@ class GUI(Tk):
 		# bind simulate button
 		self.bind("<<input_simulate>>", self.submit)
 
+		# bind save button
+		self.bind("<<output_save>>", self.saveData)
+
 		# bind clear button
 		self.bind("<<output_clear>>", self.clearConsole)
 
@@ -55,11 +59,14 @@ class GUI(Tk):
 
 		# initialize console
 		self.makeConsole()
+		self.printIntro()
 
 	def makeConsole(self):
-		self.console = Text(self.frameOut, wrap = WORD)
+		consoleFrame = Frame(self.frameOut)
+		consoleFrame.pack(side=TOP, padx=5, pady=5)
+		self.console = Text(consoleFrame, wrap = WORD)
 		self.console.config(state=DISABLED) # start with console as disabled (non-editable)
-		scrollbar = Scrollbar(self.frameOut)
+		scrollbar = Scrollbar(consoleFrame)
 		scrollbar.config(command = self.console.yview)
 		self.console.config(yscrollcommand=scrollbar.set)
 		self.console.grid(column=0, row=0)
@@ -71,6 +78,20 @@ class GUI(Tk):
 		self.update()
 		self.console.config(state=DISABLED) # disable (non-editable) console
 
+	def saveData(self, event):
+		# get filename
+		filename = tkFileDialog.asksaveasfilename(title="Save as...", defaultextension='.txt')
+		
+		if filename:
+			file = open(filename, mode='w')
+			data = self.console.get(1.0, END)
+			encodedData = data.encode('utf-8')
+			text = str(encodedData)
+		
+			
+			file.write(text)
+			file.close()
+
 	def clearConsole(self, event):
 		self.console.config(state=NORMAL) # make console editable
 		self.console.delete('1.0', END)
@@ -78,6 +99,11 @@ class GUI(Tk):
 
 	def updateStatusBar(self, text=' '):
 		self.statusText.set(text)
+
+	def printIntro(self):
+		self.writeToConsole("Approximate SRPTE \n\n This application simulates a single server with Poisson arrivals and processing times\
+		of a general distribution. Each arrival has an estimation error within a percent error taken as input. Arrivals are assigned to\
+		SRPT classes using the methods described in Adaptive and Scalable Comparison Scheduling.")
 
 	def printParams(self, arrRate, procRate, percError, splitMech, simLength):
 		self.writeToConsole("--------------------------------------------------------------------------------")
@@ -224,14 +250,25 @@ class Output(LabelFrame):
 		LabelFrame.__init__(self, master, text = "Output")
 		self.grid_columnconfigure(0, weight=1)
 		self.grid_rowconfigure(0, weight=1)
+		
+		buttonFrame = Frame(self)
+		buttonFrame.pack(side=BOTTOM, padx=5, pady=5)
 
 		# Clear Button
-		self.clearButton = Button(self, text = "CLEAR", command = self.OnButtonClick)
-		self.clearButton.grid(row = 2, columnspan = 2)
+		self.clearButton = Button(buttonFrame, text = "CLEAR ALL DATA", command = self.OnClearButtonClick)
+		self.clearButton.grid(row = 2, column = 0)
+		
+		# Save Button
+		self.saveButton = Button(buttonFrame, text = "SAVE ALL DATA", command = self.OnSaveButtonClick)
+		self.saveButton.grid(row=2, column=1)
 
-	def OnButtonClick(self):
+	def OnClearButtonClick(self):
 		# clear console
 		self.clearButton.event_generate("<<output_clear>>")
+
+	def OnSaveButtonClick(self):
+		# save data
+		self.saveButton.event_generate("<<output_save>>")
 
 
 #----------------------------------------------------------------------#
@@ -460,7 +497,7 @@ class ServerClass(Process):
 #----------------------------------------------------------------------#
 def main():
 	window = GUI(None)                          	# instantiate the class with no parent (None)
-	window.title('Single Server SRPT with Errors')  # title the window
+	window.title('Single Server Approximate SRPT with Errors')  # title the window
 
 	#global variables used in JobClass
 	main.timesClicked = 0		
