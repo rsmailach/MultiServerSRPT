@@ -55,22 +55,24 @@ class GUI(Tk):
 		# initialize console
 		self.makeConsole()
 		self.printIntro()
-
+		self.updateStatusBar("Waiting for submit...")
 
 	def makeConsole(self):
-		self.console = Text(self.frameOut, wrap = WORD)
+		consoleFrame = Frame(self.frameOut)
+		consoleFrame.pack(side=TOP, padx=5, pady=5)
+		self.console = Text(consoleFrame, wrap = WORD)
 		self.console.config(state=DISABLED) # start with console as disabled (non-editable)
-		scrollbar = Scrollbar(self.frameOut)
+		scrollbar = Scrollbar(consoleFrame)
 		scrollbar.config(command = self.console.yview)
 		self.console.config(yscrollcommand=scrollbar.set)
 		self.console.grid(column=0, row=0)
 		scrollbar.grid(column=1, row=0, sticky='NS')
 
 	def writeToConsole(self, text = ' '):
-		consoleWidget.config(state=NORMAL) # make console editable
-		consoleWidget.insert(END, '%s\n'%text)
+		self.console.config(state=NORMAL) # make console editable
+		self.console.insert(END, '%s\n'%text)
 		self.update()
-		consoleWidget.config(state=DISABLED) # disable (non-editable) console
+		self.console.config(state=DISABLED) # disable (non-editable) console
 
 	def saveData(self, event):
 		# get filename
@@ -82,9 +84,13 @@ class GUI(Tk):
 			encodedData = data.encode('utf-8')
 			text = str(encodedData)
 		
-			
 			file.write(text)
+
 			file.close()
+
+	# Empty queue file at the begining of each simulation
+	def clearQueueFile(self):
+		open('SRPTE_Queue.txt', 'w').close()
 
 	def clearConsole(self, event):
 		self.console.config(state=NORMAL) # make console editable
@@ -95,7 +101,7 @@ class GUI(Tk):
 		self.statusText.set(text)
 	
 	def printIntro(self):
-		self.writeToConsole("SRPTE \nThis application simulates a single server with Poisson arrivals and processing times of a general distribution. Each arrival has an estimation error within a percent error taken as input.")
+		self.writeToConsole("SRPTE \n\n This application simulates a single server with Poisson arrivals and processing times of a general distribution. Each arrival has an estimation error within a percent error taken as input.")
 
 	def printParams(self, arrRate, procRate, percError, simLength):	
 		self.writeToConsole("--------------------------------------------------------------------------------")
@@ -113,15 +119,13 @@ class GUI(Tk):
 				
 	def submit(self, event):
 		self.updateStatusBar("Simulating...")
+		self.clearQueueFile()
 
 		inputInstance = Input(self)
 		resource=Resource(capacity=1, name='Processor')
 
-		self.disableTabs(inputInstance.simList)
-
 		self.printParams(inputInstance.valuesList[0], inputInstance.valuesList[1],\
-				 inputInstance.valuesList[2], inputInstance.valuesList[3],\
-				 inputInstance.valuesList[4])
+				 inputInstance.valuesList[2], inputInstance.valuesList[3])
 
 		main.timesClicked = 0
 
@@ -129,10 +133,10 @@ class GUI(Tk):
 		A = ArrivalClass(self)
 		activate(A, A.GenerateArrivals(	inputInstance.valuesList[0], "Exponential",\
 						inputInstance.valuesList[1], inputInstance.distList[1],\
-						inputInstance.valuesList[2], inputInstance.valuesList[3], resource))
+						inputInstance.valuesList[2], resource))
 
 		ArrivalClass.m.observe(0)        # number in system is 0 at the start
-		simulate(until=inputInstance.valuesList[4])
+		simulate(until=inputInstance.valuesList[3])
 
 		self.DisplayData()
 		
@@ -245,12 +249,15 @@ class Output(LabelFrame):
 		self.grid_columnconfigure(0, weight=1)
 		self.grid_rowconfigure(0, weight=1)
 
+		buttonFrame = Frame(self)
+		buttonFrame.pack(side=BOTTOM, padx=5, pady=5)
+
 		# Clear Button
-		self.clearButton = Button(self, text = "CLEAR ALL DATA", command = self.OnClearButtonClick)
+		self.clearButton = Button(buttonFrame, text = "CLEAR ALL DATA", command = self.OnClearButtonClick)
 		self.clearButton.grid(row = 2, column = 0)
 		
 		# Save Button
-		self.saveButton = Button(self, text = "SAVE ALL DATA", command = self.OnSaveButtonClick)
+		self.saveButton = Button(buttonFrame, text = "SAVE ALL DATA", command = self.OnSaveButtonClick)
 		self.saveButton.grid(row=2, column=1)
 
 	def OnClearButtonClick(self):
@@ -306,15 +313,16 @@ class CustomDist(object):
 		self.b=Button(frame4,text='Ok',command=self.cleanup)
 		self.b.pack()
 
-
    	def cleanup(self):
 		self.stringEquation=self.convertFunction()
 		self.top.destroy()
 
 	def insertMu(self):
 		self.e.insert(END, u'\u03bc')
+
 	def insertU(self):
 		self.e.insert(END, "u")
+
 	def insertLn(self):
 		self.e.insert(END, "ln")
 
@@ -362,6 +370,12 @@ class ArrivalClass(Process):
 		}
 		return ArrivalDistributions[arrDist]
 
+	def AddJobToFile(self, job):
+		text = str([job.name, job.arrivalTime, job.procTime, job.estimatedProcTime]) + "\n"
+		with open("SRPTE_Queue.txt", "a") as myFile:
+			myFile.write(text)
+			myFile.close()
+
 	
 	def GenerateArrivals(self, arrRate, arrDist, procRate, procDist, percError, server):
 		while 1:
@@ -373,9 +387,10 @@ class ArrivalClass(Process):
 			J.name = "Job%02d"%self.ctr
 			
 			# add job to queue
+			self.AddJobToFile(J)
 			ServerClass.Queue.append(J)
 
-			GUI.writeToConsole(self.master "%.6f | %s arrived"%(now(), J.name))
+			GUI.writeToConsole(self.master, "%.6f | %s arrived"%(now(), J.name))
 			GUI.writeToConsole(self.master, "\nREMAINING QUEUE LENGTH: %d "%len(ServerClass.Queue) + str([job.name for job in ServerClass.Queue]))
 
 
@@ -431,7 +446,7 @@ class JobClass(object):
 	def SetJobAttributes(self, procRate, procDist, percError):
 		# generate processing time for the job
 		self.procTime = self.SetServiceDist(procRate, procDist)
-		self.estimatedProcTime = (1 + (self.GenerateError(percError)/100.0))*self.procTime			
+		self.estimatedProcTime = (1 + (self.GenerateError(percError)/100.0))*self.procTime		
 
 
 #----------------------------------------------------------------------#
@@ -448,14 +463,13 @@ class ServerClass(Process):
 	def __init__(self, master):
 		Process.__init__(self)
 		self.master = master
-		guiInstance = GUI(self)
 
 	def ExecuteJobs(self, server):
 		ServerClass.NumJobsInSys += 1
 		ArrivalClass.m.observe(ServerClass.NumJobsInSys)
 
 		# first job in queue requests service
-		GUI.writeToConsole(self.master "%.6f | %s requests service"%(now(), ServerClass.Queue[0].name))
+		GUI.writeToConsole(self.master, "%.6f | %s requests service"%(now(), ServerClass.Queue[0].name))
 		yield request,self, server
 		
 		# job is removed from queue, ready to start executing

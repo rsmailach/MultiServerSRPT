@@ -60,6 +60,7 @@ class GUI(Tk):
 		# initialize console
 		self.makeConsole()
 		self.printIntro()
+		self.updateStatusBar("Waiting for submit...")
 
 	def makeConsole(self):
 		consoleFrame = Frame(self.frameOut)
