@@ -117,14 +117,22 @@ class GUI(Tk):
 		self.writeToConsole('\n\nSINGLE SERVER SRPT')
 		self.writeToConsole('Average number of jobs in the system at any given time %s' %ArrivalClass.m.timeAverage())
 		self.writeToConsole('Average time in system, from start to completion is %s' %ArrivalClass.mT.mean())
-		self.writeToConsole('Average processing time, based on generated service times is %s\n\n\n' %ArrivalClass.msT.mean())
+		self.writeToConsole('Average processing time, based on generated service times is %s' %ArrivalClass.msT.mean())
+		self.writeToConsole('Variance of processing time %s\n' %ArrivalClass.msT.var())
+		self.writeToConsole('Request order: %s' % ArrivalClass.JobOrderIn)
+		self.writeToConsole('Service order: %s\n\n\n' % ServerClass.JobOrderOut)
+
 				
 	def submit(self, event):
 		self.updateStatusBar("Simulating...")
 		self.clearQueueFile()
 
 		inputInstance = Input(self)
-		resource=Resource(capacity=1, name='Processor', preemptable=True)
+		resource=Resource(capacity=1, name='Processor', qType=PriorityQ, preemptable=True) #simpy 
+		#  r.waitQ, a queue (list) of processes that have requested but not yet received a unit of r,
+		#    so len(r.waitQ) is the number of process objects currently waiting.
+		#  r.activeQ, a queue (list) of process objects currently using one of the Resources units,
+		#    so len(r.activeQ) is the number of units that are currently in use.
 
 		self.printParams(inputInstance.valuesList[0], inputInstance.valuesList[1],\
 				 inputInstance.valuesList[2], inputInstance.valuesList[3])
@@ -348,6 +356,8 @@ class CustomDist(object):
 #
 #----------------------------------------------------------------------#
 class ArrivalClass(Process):
+	JobOrderIn = []
+
 	def __init__(self, master):
 		Process.__init__(self)
 		self.master = master
@@ -362,6 +372,8 @@ class ArrivalClass(Process):
 		ArrivalClass.msT.reset()	
 	
 		self.ctr = 0
+
+
 
 	# Dictionary of arrival distributions
 	def SetArrivalDist(self, arrRate, arrDist):
@@ -387,9 +399,11 @@ class ArrivalClass(Process):
 
 		with open("SRPTE_Queue.txt", "w") as myFile:
 			for eachline in sort:
-				line = ','.join(eachline)		# convert each row to correct format
+				line = ','.join(eachline)	# convert each row to correct format
 				myFile.write(line + '\n')
+				print line
 			myFile.close()
+			print "\n"
 
 
 	def GenerateArrivals(self, arrRate, arrDist, procRate, procDist, percError, server):
@@ -403,6 +417,7 @@ class ArrivalClass(Process):
 			
 			# add job to queue
 			self.AddJobToFile(J)
+			ArrivalClass.JobOrderIn.append(J.name)
 			#ServerClass.Queue.append(J)
 
 			GUI.writeToConsole(self.master, "%.6f | %s arrived"%(now(), J.name))
@@ -427,6 +442,8 @@ class JobClass(object):
 		self.master = master
 		self.arrivalTime = now()
 		self.procTime = 0
+		self.priority = 0
+		self.remainingProcTime = 0
 
 	# dictionary of service distributions
 	def SetServiceDist(self, procRate, procDist):
@@ -462,7 +479,8 @@ class JobClass(object):
 	def SetJobAttributes(self, procRate, procDist, percError):
 		# generate processing time for the job
 		self.procTime = self.SetServiceDist(procRate, procDist)
-		self.estimatedProcTime = (1 + (self.GenerateError(percError)/100.0))*self.procTime		
+		self.estimatedProcTime = (1 + (self.GenerateError(percError)/100.0))*self.procTime
+		self.remainingProcTime = self.procTime		
 
 
 #----------------------------------------------------------------------#
@@ -474,6 +492,7 @@ class JobClass(object):
 class ServerClass(Process):
 	NumJobsInSys = 0
 	CompletedJobs = 0
+	JobOrderOut = []
 
 	def __init__(self, master):
 		Process.__init__(self)
@@ -492,6 +511,7 @@ class ServerClass(Process):
 		job.arrivalTime = float(firstRow[1])
 		job.procTime = float(firstRow[2])
 		job.estimatedProcTime = float(firstRow[3])
+		job.priority = 1
 		return job
 
 	def RemoveFirstJobQueued(self):
@@ -508,22 +528,32 @@ class ServerClass(Process):
 
 		# first job in queue requests service
 		Job = self.GetFirstJobQueued()
-		GUI.writeToConsole(self.master, "%.6f | %s requests service"%(now(), Job.name))
-		yield request, self, server
+		GUI.writeToConsole(self.master, "%.6f | %s requests service, priority = %s"%(now(), Job.name, Job.priority))
+		yield request, self, server, Job.priority
 		
+		# set job priority back to 0, so can be preempted by job earlier in the queue
+		Job.priority = 0
+		serviceStartTime = now()
+
 		# job is ready to start executing
-		GUI.writeToConsole(self.master, "%.6f | %s server request granted, begin executing"%(now(), Job.name))
+		GUI.writeToConsole(self.master, "%.6f | %s server request granted, begin executing, priority = %s"%(now(), Job.name, Job.priority))		
 
 		# SHOULD REAL OR ESTIMATED PROC TIME BE OBSERVED HERE???????????????????????????????????????????????????????????????????????????
 		ArrivalClass.msT.observe(Job.procTime)
-		yield hold, self, Job.procTime # process job according to REAL processing time
+		yield hold, self, Job.remainingProcTime # process job according to REAL processing time
+
+		serviceTime = now() - serviceStartTime		
 
 		# job completed, release
 		yield release, self, server
-		GUI.writeToConsole(self.master, "%.6f | %s completed"%(now(), Job.name))
+		ServerClass.JobOrderOut.append(Job.name)
+		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED, priority = %s"%(now(), Job.name, Job.priority))
 
-		#if (timeProcessed - procTime) == 0: #############################IF remaining PROCTIME = 0
-			self.RemoveFirstJobQueued() #############################IF PROCTIME = 0		
+		GUI.writeToConsole(self.master, "First job in queue %s"%self.GetFirstJobQueued().name)
+		Job.remainingProcTime -= serviceTime
+		#if Job.remainingProcTime == 0: 		#############################IF remaining PROCTIME = 0
+		#	print "0 processing time remainng"
+		self.RemoveFirstJobQueued() 	#############################IF PROCTIME = 0		
 
 		ServerClass.NumJobsInSys -= 1
 		ArrivalClass.m.observe(ServerClass.NumJobsInSys)
