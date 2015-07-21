@@ -141,7 +141,7 @@ class GUI(Tk):
 
 		initialize()
 		A = ArrivalClass(self)
-		activate(A, A.GenerateArrivals(	inputInstance.valuesList[0], "Exponential",\
+		activate(A, A.GenerateArrivals(	inputInstance.valuesList[0], "Poisson",\
 						inputInstance.valuesList[1], inputInstance.distList[1],\
 						inputInstance.valuesList[2], resource))
 
@@ -182,22 +182,23 @@ class Input(LabelFrame):
 		self.grid_rowconfigure(0, weight=1)
 
 		# Labels
-		labels = [u'\u03bb', u'\u03bc', '% error            ' u"\u00B1", 'simulation length']
+		labels = ['Interarrival Rate (' + u'\u03bb' + ')', 'Processing Rate (' + u'\u03bc' + ')', '% Error' , 'Simulation Length']
 		r=0
 		c=0
 		for elem in labels:
 			Label(self, text=elem).grid(row=r, column=c)
 			r=r+1
+		Label(self, text=u"\u00B1").grid(row=2, column=1)
 
 		# Entry Boxes
 		self.entry_1 = Entry(self, textvariable = self.arrivalRateInput)
 		self.entry_2 = Entry(self, textvariable = self.processingRateInput)
 		self.entry_3 = Entry(self, textvariable = self.percentErrorInput)
 		self.entry_4 = Entry(self, textvariable = self.simLengthInput)
-		self.entry_1.grid(row = 0, column = 1)
-		self.entry_2.grid(row = 1, column = 1)
-		self.entry_3.grid(row = 2, column = 1)
-		self.entry_4.grid(row = 3, column = 1)
+		self.entry_1.grid(row = 0, column = 2)
+		self.entry_2.grid(row = 1, column = 2)
+		self.entry_3.grid(row = 2, column = 2)
+		self.entry_4.grid(row = 3, column = 2)
 
 
 		# Distribution Dropdowns
@@ -207,11 +208,11 @@ class Input(LabelFrame):
 		#self.comboBox_1.grid(row = 0, column = 2)
 		self.comboBox_2 = ttk.Combobox(self, values = self.distributions, state = 'readonly')
 		self.comboBox_2.current(1) # set default selection 					#####################CHANGE LATER
-		self.comboBox_2.grid(row = 1, column = 2)
+		self.comboBox_2.grid(row = 1, column = 3)
 
 		# Simulate Button
 		self.simulateButton = Button(self, text = "SIMULATE", command = self.OnButtonClick)
-		self.simulateButton.grid(row = 7, columnspan = 3)
+		self.simulateButton.grid(row = 7, columnspan = 4)
 
 	def OnButtonClick(self):
 		self.GetNumericValues()
@@ -378,6 +379,7 @@ class ArrivalClass(Process):
 	# Dictionary of arrival distributions
 	def SetArrivalDist(self, arrRate, arrDist):
 		ArrivalDistributions = {
+			'Poisson': random.expovariate(1.0/arrRate),
 			'Exponential': random.expovariate(arrRate)
 			#'Normal': Rnd.normalvariate(self.inputInstance.valuesList[0])
 			#'Custom':

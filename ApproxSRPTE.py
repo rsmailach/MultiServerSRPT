@@ -106,13 +106,13 @@ class GUI(Tk):
 		of a general distribution. Each arrival has an estimation error within a percent error taken as input. Arrivals are assigned to\
 		SRPT classes using the methods described in Adaptive and Scalable Comparison Scheduling.")
 
-	def printParams(self, arrRate, procRate, percError, splitMech, simLength):
+	def printParams(self, arrRate, procRate, percError, numClasses, simLength):
 		self.writeToConsole("--------------------------------------------------------------------------------")
 		self.writeToConsole("PARAMETERS:")
 		self.writeToConsole("Arrival Rate = %.4f"%arrRate)
 		self.writeToConsole("Processing Rate = %.4f"%procRate)
 		self.writeToConsole("% Error  = " + u"\u00B1" + " %.4f"%percError)
-		self.writeToConsole("Splitting mechanism = %d"%splitMech)
+		self.writeToConsole("Number of Classes = %d"%numClasses)
 		self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
 
 	def DisplayData(self):
@@ -135,7 +135,7 @@ class GUI(Tk):
 
 		initialize()
 		A = ArrivalClass(self)
-		activate(A, A.GenerateArrivals(	inputInstance.valuesList[0], "Exponential",\
+		activate(A, A.GenerateArrivals(	inputInstance.valuesList[0], "Poisson",\
 						inputInstance.valuesList[1], inputInstance.distList[1],\
 						inputInstance.valuesList[2], inputInstance.valuesList[3], resource))
 
@@ -163,37 +163,38 @@ class Input(LabelFrame):
 		self.arrivalRateInput = DoubleVar()
 		self.processingRateInput = DoubleVar()
 		self.percentErrorInput = DoubleVar()
-		self.splittingMechanismInput = IntVar()
+		self.numberOfClassesInput = IntVar()
 		self.simLengthInput = DoubleVar()
 
 		self.grid_columnconfigure(0, weight=1)
 		self.grid_rowconfigure(0, weight=1)
 
 		# Labels
-		labels = [u'\u03bb', u'\u03bc', '% error            ' u"\u00B1", 'splitting mechansim', 'simulation length']
+		labels = ['Interarrival Rate (' + u'\u03bb' + ')', 'Processing Rate (' + u'\u03bc' + ')', '% Error', 'Number of Classes', 'Simulation Length']
 		r=0
 		c=0
 		for elem in labels:
 			Label(self, text=elem).grid(row=r, column=c)
 			r=r+1
+		Label(self, text=u"\u00B1").grid(row=2, column=1)
 
 		# Entry Boxes
 		self.entry_1 = Entry(self, textvariable = self.arrivalRateInput)
 		self.entry_2 = Entry(self, textvariable = self.processingRateInput)
 		self.entry_3 = Entry(self, textvariable = self.percentErrorInput)
-		self.entry_4 = Entry(self, textvariable = self.splittingMechanismInput)
+		self.entry_4 = Entry(self, textvariable = self.numberOfClassesInput)
 		self.entry_5 = Entry(self, textvariable = self.simLengthInput)
-		self.entry_1.grid(row = 0, column = 1)
-		self.entry_2.grid(row = 1, column = 1)
-		self.entry_3.grid(row = 2, column = 1)
-		self.entry_4.grid(row = 3, column = 1)
-		self.entry_5.grid(row = 4, column = 1)
+		self.entry_1.grid(row = 0, column = 2)
+		self.entry_2.grid(row = 1, column = 2)
+		self.entry_3.grid(row = 2, column = 2)
+		self.entry_4.grid(row = 3, column = 2)
+		self.entry_5.grid(row = 4, column = 2)
 
 
 
 		# Simulate Button
 		self.simulateButton = Button(self, text = "SIMULATE", command = self.OnButtonClick)
-		self.simulateButton.grid(row = 5, columnspan = 3)
+		self.simulateButton.grid(row = 5, columnspan = 4)
 
 		# Distribution Dropdowns
 		self.distributions = ('Select Distribution', 'Exponential', 'Uniform', 'Custom')
@@ -202,7 +203,7 @@ class Input(LabelFrame):
 		#self.comboBox_1.grid(row = 0, column = 2)
 		self.comboBox_2 = ttk.Combobox(self, values = self.distributions, state = 'readonly')
 		self.comboBox_2.current(1) # set default selection 					#####################CHANGE LATER
-		self.comboBox_2.grid(row = 1, column = 2)
+		self.comboBox_2.grid(row = 1, column = 3)
 
 
 	def OnButtonClick(self):
@@ -217,14 +218,14 @@ class Input(LabelFrame):
 		arrivalRate = self.arrivalRateInput.get()
 		processingRate = self.processingRateInput.get()
 		percentError = self.percentErrorInput.get()
-		splittingMechanism = self.splittingMechanismInput.get()
+		numberOfClasses = self.numberOfClassesInput.get()
 		maxSimLength = self.simLengthInput.get()
 
 		if arrivalRate <= 0.0: tkMessageBox.showerror("Input Error", "Arrival rate must be non-zero value!")
 		if processingRate <= 0.0: tkMessageBox.showerror("Input Error", "Processing rate must be non-zero value!")
 		if maxSimLength <= 0.0: tkMessageBox.showerror("Input Error", "imulation length must be non-zero value!")
 
-		Input.valuesList = [arrivalRate, processingRate, percentError, splittingMechanism, maxSimLength]
+		Input.valuesList = [arrivalRate, processingRate, percentError, numberOfClasses, maxSimLength]
 		return Input.valuesList
 
 	def GetDropDownValues(self):
@@ -366,18 +367,19 @@ class ArrivalClass(Process):
 	# Dictionary of arrival distributions
 	def SetArrivalDist(self, arrRate, arrDist):
 		ArrivalDistributions = {
+			'Poisson': random.expovariate(1.0/arrRate),
 			'Exponential': random.expovariate(arrRate)
 			#'Normal': Rnd.normalvariate(self.inputInstance.valuesList[0])
 			#'Custom':
 		}
 		return ArrivalDistributions[arrDist]
 
-	def SortQueue(self, splitMech):
-		#grab the previous m (splitMech) jobs to sort jobs by estimated processing time (procTime) 
-		ServerClass.Queue[-(splitMech+1):] = sorted(ServerClass.Queue[-(splitMech+1):], key=lambda JobClass: JobClass.estimatedProcTime) 
+	def SortQueue(self, numClasses):
+		#grab the previous m (splitMech = numClasses - 1) jobs to sort jobs by estimated processing time (procTime) 
+		ServerClass.Queue[-(numClasses):] = sorted(ServerClass.Queue[-(numClasses):], key=lambda JobClass: JobClass.estimatedProcTime) 
 		return ServerClass.Queue
 	
-	def GenerateArrivals(self, arrRate, arrDist, procRate, procDist, percError, splitMech, server):
+	def GenerateArrivals(self, arrRate, arrDist, procRate, procDist, percError, numClasses, server):
 		while 1:
 			# wait for arrival of next job
 			yield hold, self, self.SetArrivalDist(arrRate, arrDist)
@@ -393,7 +395,7 @@ class ArrivalClass(Process):
 			GUI.writeToConsole(self.master, "\nREMAINING QUEUE LENGTH: %d "%len(ServerClass.Queue) + str([job.name for job in ServerClass.Queue]))
 
 			# sort jobs
-			self.SortQueue(splitMech)
+			self.SortQueue(numClasses)
 
 			S = ServerClass(self.master)
 			activate(S, S.ExecuteJobs(server), delay=0)
