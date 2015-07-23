@@ -538,22 +538,26 @@ class ServerClass(Process):
 
 		# first job in queue requests service
 		Job = self.GetFirstJobQueued()
-		GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated remaining proc time = %s"%(now(), Job.name, Job.estimatedRemainingProcTime))
-		yield request, self, server, Job.priority
 		
-		# job is ready to start executing
-		serviceStartTime = now()
-		GUI.writeToConsole(self.master, "%.6f | %s server request granted, begin executing"%(now(), Job.name))
-		ArrivalClass.msT.observe(Job.realRemainingProcTime)
-		yield hold, self, Job.realRemainingProcTime # process job according to REAL processing time
+		try:
+			GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated remaining proc time = %s"%(now(), Job.name, Job.estimatedRemainingProcTime))
+			yield request, self, server, Job.priority
+		
+			# job is ready to start executing
+			serviceStartTime = now()
+			GUI.writeToConsole(self.master, "%.6f | %s server request granted"%(now(), Job.name))
+			ArrivalClass.msT.observe(Job.realRemainingProcTime)
+			yield hold, self, Job.realRemainingProcTime # process job according to REAL processing time
 
-		## PROBLEM:: IF PREEMPTED, THIS DOES NOT RUN AS IT IS FROZEN IN THE YIELD STATEMENT
-		# Job has had some processing time (may not yet be complete), update values
-		serviceTime = now() - serviceStartTime	
-		Job.realRemainingProcTime -= serviceTime
-		Job.estimatedRemainingProcTime -= serviceTime
-		Job.priority = Job.estimatedRemainingProcTime
-
+		# Preempted, update values
+		except Job.interrupted(): ##################################################### NOT WORKING... SIMPY 2 ISSUE?
+			GUI.writeToConsole(self.master, "%.6f | %s preempted..............................."%(now(), Job.name))
+							## PROBLEM:: IF PREEMPTED, THIS DOES NOT RUN AS IT IS FROZEN IN THE YIELD STATEMENT
+			# Job has had some processing time (may not yet be complete), update values
+			serviceTime = now() - serviceStartTime	
+			Job.realRemainingProcTime -= serviceTime
+			Job.estimatedRemainingProcTime -= serviceTime
+			Job.priority = Job.estimatedRemainingProcTime
 
 		# Job completed and released
 		yield release, self, server
