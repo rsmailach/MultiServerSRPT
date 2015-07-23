@@ -3,7 +3,8 @@
 #
 # This application simulates a single server with Poisson arrivals
 # and processing times of a general distribution. There are errors in
-# time estimates within a range.
+# time estimates within a range. Jobs are serviced in order of shortest 
+# remaining processing time.
 #
 # Rachel Mailach
 #----------------------------------------------------------------------#
@@ -103,7 +104,7 @@ class GUI(Tk):
 		self.statusText.set(text)
 	
 	def printIntro(self):
-		self.writeToConsole("SRPTE \n\n This application simulates a single server with Poisson arrivals and processing times of a general distribution. Each arrival has an estimation error within a percent error taken as input.")
+		self.writeToConsole("SRPTE \n\n This application simulates a single server with Poisson arrivals and processing times of a general distribution. Each arrival has an estimation error within a percent error taken as input. Jobs are serviced in order of shortest remaining processing time.")
 
 	def printParams(self, arrRate, procRate, percError, simLength):	
 		self.writeToConsole("--------------------------------------------------------------------------------")
@@ -129,6 +130,7 @@ class GUI(Tk):
 
 		inputInstance = Input(self)
 		resource=Resource(capacity=1, name='Processor', qType=PriorityQ, preemptable=True) #simpy 
+
 		#  r.waitQ, a queue (list) of processes that have requested but not yet received a unit of r,
 		#    so len(r.waitQ) is the number of process objects currently waiting.
 		#  r.activeQ, a queue (list) of process objects currently using one of the Resources units,
@@ -387,7 +389,8 @@ class ArrivalClass(Process):
 		return ArrivalDistributions[arrDist]
 
 	def AddJobToFile(self, job):
-		text = str(job.name) + "," + str(job.arrivalTime) + "," + str(job.procTime) + "," + str(job.estimatedProcTime) + "\n"
+		text = str(job.name) + "," + str(job.arrivalTime) + "," + str(job.realRemainingProcTime) + "," + \
+			str(job.estimatedRemainingProcTime) + "\n"
 		
 		with open("SRPTE_Queue.txt", "a") as myFile:
 			myFile.write(text)
@@ -422,8 +425,10 @@ class ArrivalClass(Process):
 			ArrivalClass.JobOrderIn.append(J.name)
 			#ServerClass.Queue.append(J)
 
-			GUI.writeToConsole(self.master, "%.6f | %s arrived"%(now(), J.name))
+			GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %s"%(now(), J.name, J.estimatedRemainingProcTime))
 			#GUI.writeToConsole(self.master, "\nREMAINING QUEUE LENGTH: %d "%len(ServerClass.Queue) + str([job.name for job in ServerClass.Queue]))
+			
+
 			# sort queue
 			self.SortQueueFile()
 
@@ -445,7 +450,8 @@ class JobClass(object):
 		self.arrivalTime = now()
 		self.procTime = 0
 		self.priority = 0
-		self.remainingProcTime = 0
+		self.realRemainingProcTime = 0
+		self.estimatedRemainingProcTime = 0
 
 	# dictionary of service distributions
 	def SetServiceDist(self, procRate, procDist):
@@ -482,7 +488,8 @@ class JobClass(object):
 		# generate processing time for the job
 		self.procTime = self.SetServiceDist(procRate, procDist)
 		self.estimatedProcTime = (1 + (self.GenerateError(percError)/100.0))*self.procTime
-		self.remainingProcTime = self.procTime		
+		self.realRemainingProcTime = self.procTime
+		self.estimatedRemainingProcTime = self.estimatedProcTime		
 
 
 #----------------------------------------------------------------------#
@@ -511,9 +518,10 @@ class ServerClass(Process):
 
 		job.name = str(firstRow[0])
 		job.arrivalTime = float(firstRow[1])
-		job.procTime = float(firstRow[2])
-		job.estimatedProcTime = float(firstRow[3])
-		job.priority = 1
+		job.realRemainingProcTime = float(firstRow[2])
+		job.estimatedRemainingProcTime = float(firstRow[3])
+		job.priority = -job.estimatedRemainingProcTime		# Priority is negative of estimated remaining processing time, \
+									# less processing time remaining equals higher priority
 		return job
 
 	def RemoveFirstJobQueued(self):
@@ -530,32 +538,28 @@ class ServerClass(Process):
 
 		# first job in queue requests service
 		Job = self.GetFirstJobQueued()
-		GUI.writeToConsole(self.master, "%.6f | %s requests service, priority = %s"%(now(), Job.name, Job.priority))
+		GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated remaining proc time = %s"%(now(), Job.name, Job.estimatedRemainingProcTime))
 		yield request, self, server, Job.priority
 		
-		# set job priority back to 0, so can be preempted by job earlier in the queue
-		Job.priority = 0
-		serviceStartTime = now()
-
 		# job is ready to start executing
-		GUI.writeToConsole(self.master, "%.6f | %s server request granted, begin executing, priority = %s"%(now(), Job.name, Job.priority))		
+		serviceStartTime = now()
+		GUI.writeToConsole(self.master, "%.6f | %s server request granted, begin executing"%(now(), Job.name))
+		ArrivalClass.msT.observe(Job.realRemainingProcTime)
+		yield hold, self, Job.realRemainingProcTime # process job according to REAL processing time
 
-		# SHOULD REAL OR ESTIMATED PROC TIME BE OBSERVED HERE???????????????????????????????????????????????????????????????????????????
-		ArrivalClass.msT.observe(Job.procTime)
-		yield hold, self, Job.remainingProcTime # process job according to REAL processing time
+		## PROBLEM:: IF PREEMPTED, THIS DOES NOT RUN AS IT IS FROZEN IN THE YIELD STATEMENT
+		# Job has had some processing time (may not yet be complete), update values
+		serviceTime = now() - serviceStartTime	
+		Job.realRemainingProcTime -= serviceTime
+		Job.estimatedRemainingProcTime -= serviceTime
+		Job.priority = Job.estimatedRemainingProcTime
 
-		serviceTime = now() - serviceStartTime		
 
-		# job completed, release
+		# Job completed and released
 		yield release, self, server
+		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(now(), Job.name))
 		ServerClass.JobOrderOut.append(Job.name)
-		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED, priority = %s"%(now(), Job.name, Job.priority))
-
-		GUI.writeToConsole(self.master, "First job in queue %s"%self.GetFirstJobQueued().name)
-		Job.remainingProcTime -= serviceTime
-		#if Job.remainingProcTime == 0: 		#############################IF remaining PROCTIME = 0
-		#	print "0 processing time remainng"
-		self.RemoveFirstJobQueued() 	#############################IF PROCTIME = 0		
+		self.RemoveFirstJobQueued()	
 
 		ServerClass.NumJobsInSys -= 1
 		ArrivalClass.m.observe(ServerClass.NumJobsInSys)
