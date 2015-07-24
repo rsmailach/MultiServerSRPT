@@ -139,15 +139,15 @@ class GUI(Tk):
 		env = simpy.Environment()
 		resource = simpy.PreemptiveResource(env, capacity=1) 
 		
-		A = ArrivalClass(self, env)
-		arrivalProcess = env.process(A.GenerateArrivals(inputInstance.valuesList[0], "Poisson",\
+		A = ArrivalClass(self)
+		arrivalProcess = env.process(A.GenerateArrivals(env, inputInstance.valuesList[0], 'Poisson',\
 								inputInstance.valuesList[1], inputInstance.distList[1],\
 								inputInstance.valuesList[2], resource))
 
 		#ArrivalClass.m.observe(0)        # number in system is 0 at the start
 		
 		# Start processes
-		env.run(until=inputInstance.valuesList[3])
+		env.run(until=100)#inputInstance.valuesList[3])
 		self.DisplayData()
 		self.updateStatusBar("Simulation complete.")
 
@@ -358,8 +358,7 @@ class CustomDist(object):
 class ArrivalClass(object):
 	JobOrderIn = []
 
-	def __init__(self, env, master):
-		self.env = env
+	def __init__(self, master):
 		self.master = master
 
 		#ArrivalClass.m = Monitor() # monitor for number of jobs
@@ -372,8 +371,6 @@ class ArrivalClass(object):
 		#ArrivalClass.msT.reset()	
 	
 		self.ctr = 0
-
-
 
 	# Dictionary of arrival distributions
 	def SetArrivalDist(self, arrRate, arrDist):
@@ -408,10 +405,10 @@ class ArrivalClass(object):
 			print "\n"
 
 
-	def GenerateArrivals(self, arrRate, arrDist, procRate, procDist, percError, server):
+	def GenerateArrivals(self, env, arrRate, arrDist, procRate, procDist, percError, server):
 		while 1:
 			# wait for arrival of next job
-			yield self.env.timeout(self.SetArrivalDist(arrRate, arrDist))
+			yield env.timeout(self.SetArrivalDist(arrRate, arrDist))
 
 			J = JobClass(self.master)
 			J.SetJobAttributes(procRate, procDist, percError)
@@ -425,7 +422,6 @@ class ArrivalClass(object):
 			GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %s"%(now(), J.name, J.estimatedRemainingProcTime))
 			#GUI.writeToConsole(self.master, "\nREMAINING QUEUE LENGTH: %d "%len(ServerClass.Queue) + str([job.name for job in ServerClass.Queue]))
 			
-
 			# sort queue
 			self.SortQueueFile()
 
@@ -473,8 +469,6 @@ class JobClass(object):
         		self.master.wait_window(self.popup.top)
 			main.customEquation = self.popup.stringEquation
 		return eval(main.customEquation)
-
-
 
 	# generates a percent error for processing time
 	def GenerateError(self, percError):
@@ -536,7 +530,7 @@ class ServerClass(object):
 		# first job in queue requests service
 		Job = self.GetFirstJobQueued()
 		
-		#try:
+		try:
 			GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated remaining proc time = %s"%(now(), Job.name, Job.estimatedRemainingProcTime))
 
 			# request server
