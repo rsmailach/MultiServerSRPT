@@ -534,21 +534,23 @@ class ServerClass(object):
 		
 		# This "with" statement automatically releases the resource when it has completed its job
 		with server.request(priority=Job.priority) as req:
-			try:
-				# request server
-				GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated remaining proc time = %s"%(now, Job.name, Job.estimatedRemainingProcTime))
-				yield req
+			# request server
+			GUI.writeToConsole(self.master, "%.6f | %s requests service, est remaining proc time = %s"%(now, Job.name, Job.estimatedRemainingProcTime))
+			yield req
 				
-				# job is ready to start executing
-				serviceStartTime = now
-				GUI.writeToConsole(self.master, "%.6f | %s server request granted"%(now, Job.name))
-				#ArrivalClass.msT.observe(Job.realRemainingProcTime)
+			# job is ready to start executing
+			serviceStartTime = now
+			GUI.writeToConsole(self.master, "%.6f | %s server request granted"%(now, Job.name))
+			#ArrivalClass.msT.observe(Job.realRemainingProcTime)
+
+			try:
 				yield self.env.timeout(Job.realRemainingProcTime)  # (hold) process job according to REAL processing time
 
-				# Preempted, update values
-			except simpy.Interrupt(): ##################################################### NOT WORKING... SIMPY 2 ISSUE?
+			# Preempted, update values
+			except simpy.Interrupt: ##################################################### NOT WORKING... SIMPY 3 ISSUE?
 				GUI.writeToConsole(self.master, "%.6f | %s preempted..............................."%(now, Job.name))
-							## PROBLEM:: IF PREEMPTED, THIS DOES NOT RUN AS IT IS FROZEN IN THE YIELD STATEMENT
+				print "PREEMPTION!\n"
+	
 				# Job has had some processing time (may not yet be complete), update values
 				serviceTime = now - serviceStartTime	
 				Job.realRemainingProcTime -= serviceTime
