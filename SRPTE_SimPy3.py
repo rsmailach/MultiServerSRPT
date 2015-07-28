@@ -23,6 +23,7 @@ import tkFileDialog
 import csv
 import operator
 
+now = datetime.now().second + datetime.now().microsecond
 #----------------------------------------------------------------------#
 # Class: GUI
 #
@@ -139,7 +140,7 @@ class GUI(Tk):
 		env = simpy.Environment()
 		resource = simpy.PreemptiveResource(env, capacity=1) 
 		
-		A = ArrivalClass(self)
+		A = ArrivalClass(env, self)
 		arrivalProcess = env.process(A.GenerateArrivals(env, inputInstance.valuesList[0], 'Poisson',\
 								inputInstance.valuesList[1], inputInstance.distList[1],\
 								inputInstance.valuesList[2], resource))
@@ -358,7 +359,8 @@ class CustomDist(object):
 class ArrivalClass(object):
 	JobOrderIn = []
 
-	def __init__(self, master):
+	def __init__(self, env, master):
+		self.env = env
 		self.master = master
 
 		#ArrivalClass.m = Monitor() # monitor for number of jobs
@@ -419,13 +421,13 @@ class ArrivalClass(object):
 			ArrivalClass.JobOrderIn.append(J.name)
 			#ServerClass.Queue.append(J)
 
-			GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %s"%(now(), J.name, J.estimatedRemainingProcTime))
+			GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %s"%(now, J.name, J.estimatedRemainingProcTime))
 			#GUI.writeToConsole(self.master, "\nREMAINING QUEUE LENGTH: %d "%len(ServerClass.Queue) + str([job.name for job in ServerClass.Queue]))
 			
 			# sort queue
 			self.SortQueueFile()
 
-			S = ServerClass(self.master)
+			S = ServerClass(self.env, self.master)
 			serverProcess = env.process(S.ExecuteJobs(server))
 
 			self.ctr += 1
@@ -440,7 +442,7 @@ class ArrivalClass(object):
 class JobClass(object):
 	def __init__(self, master):
 		self.master = master
-		self.arrivalTime = now()
+		self.arrivalTime = now
 		self.procTime = 0
 		self.priority = 0
 		self.realRemainingProcTime = 0
@@ -530,37 +532,37 @@ class ServerClass(object):
 		# first job in queue requests service
 		Job = self.GetFirstJobQueued()
 		
-		try:
-			GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated remaining proc time = %s"%(now(), Job.name, Job.estimatedRemainingProcTime))
-
-			# request server
-			yield server.request(priority=Job.priority)
+		# This "with" statement automatically releases the resource when it has completed its job
+		with server.request(priority=Job.priority) as req:
+			try:
+				# request server
+				GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated remaining proc time = %s"%(now, Job.name, Job.estimatedRemainingProcTime))
+				yield req
 				
-			# job is ready to start executing
-			serviceStartTime = now()
-			GUI.writeToConsole(self.master, "%.6f | %s server request granted"%(now(), Job.name))
-			#ArrivalClass.msT.observe(Job.realRemainingProcTime)
-			yield self.env.timeout(Job.realRemainingProcTime)  # (hold) process job according to REAL processing time
+				# job is ready to start executing
+				serviceStartTime = now
+				GUI.writeToConsole(self.master, "%.6f | %s server request granted"%(now, Job.name))
+				#ArrivalClass.msT.observe(Job.realRemainingProcTime)
+				yield self.env.timeout(Job.realRemainingProcTime)  # (hold) process job according to REAL processing time
 
-		# Preempted, update values
-		except simpy.Interrupt(): ##################################################### NOT WORKING... SIMPY 2 ISSUE?
-			GUI.writeToConsole(self.master, "%.6f | %s preempted..............................."%(now(), Job.name))
+				# Preempted, update values
+			except simpy.Interrupt(): ##################################################### NOT WORKING... SIMPY 2 ISSUE?
+				GUI.writeToConsole(self.master, "%.6f | %s preempted..............................."%(now, Job.name))
 							## PROBLEM:: IF PREEMPTED, THIS DOES NOT RUN AS IT IS FROZEN IN THE YIELD STATEMENT
-			# Job has had some processing time (may not yet be complete), update values
-			serviceTime = now() - serviceStartTime	
-			Job.realRemainingProcTime -= serviceTime
-			Job.estimatedRemainingProcTime -= serviceTime
-			Job.priority = Job.estimatedRemainingProcTime
+				# Job has had some processing time (may not yet be complete), update values
+				serviceTime = now - serviceStartTime	
+				Job.realRemainingProcTime -= serviceTime
+				Job.estimatedRemainingProcTime -= serviceTime
+				Job.priority = Job.estimatedRemainingProcTime
 
 		# Job completed and released
-		server.release()
-		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(now(), Job.name))
+		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(now, Job.name))
 		ServerClass.JobOrderOut.append(Job.name)
 		self.RemoveFirstJobQueued()	
 
 		ServerClass.NumJobsInSys -= 1
 		#ArrivalClass.m.observe(ServerClass.NumJobsInSys)
-		#ArrivalClass.mT.observe(now() - Job.arrivalTime)
+		#ArrivalClass.mT.observe(now - Job.arrivalTime)
 
 
 
