@@ -14,14 +14,18 @@
 import simpy 
 from Tkinter import *
 from datetime import datetime
-#from random import seed,Random,expovariate,uniform,normalvariate # https://docs.python.org/2/library/random.html
+#from math import exp, log, fabs
 import random
-from math import exp, log
 import tkMessageBox
 import ttk
 import tkFileDialog
 import csv
 import operator
+
+NumJobs = []
+TimeSys = []
+ProcTime = []
+PercError = []
 
 #----------------------------------------------------------------------#
 # Class: G
@@ -126,13 +130,26 @@ class GUI(Tk):
         self.writeToConsole("% Error  = " + u"\u00B1" + " %.4f"%percError)
         self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
 
-    def DisplayData(self):          
+    def calcVariance(self, List, avg):
+	var = 0
+	for i in List:
+	    var += (avg - i)**2
+	return var/len(List)
+
+    def displayAverageData(self):
+	AvgNumJobs = float(sum(NumJobs))/len(NumJobs)
+	AvgTimeSys = float(sum(TimeSys))/len(TimeSys)
+	AvgProcTime = float(sum(ProcTime))/len(ProcTime)
+	VarProcTime = self.calcVariance(ProcTime, AvgProcTime)
+	AvgPercError = float(sum(PercError))/len(PercError)
+
         self.writeToConsole('\n\nSINGLE SERVER SRPT')
-        #self.writeToConsole('Average number of jobs in the system at any given time %s' %ArrivalClass.m.timeAverage())
-        #self.writeToConsole('Average time in system, from start to completion is %s' %ArrivalClass.mT.mean())
-        #self.writeToConsole('Average processing time, based on generated service times is %s' %ArrivalClass.msT.mean())
-        #self.writeToConsole('Variance of processing time %s\n' %ArrivalClass.msT.var())
-        self.writeToConsole('Request order: %s' % ArrivalClass.JobOrderIn)
+        self.writeToConsole('Average number of jobs in the system %s' %AvgNumJobs)
+        self.writeToConsole('Average time in system, from start to completion is %s' %AvgTimeSys)
+        self.writeToConsole('Average processing time, based on generated service times is %s' %AvgProcTime)
+        self.writeToConsole('Variance of processing time %s' %VarProcTime)
+	self.writeToConsole('Average percent error %.4f\n' %AvgPercError)
+        #self.writeToConsole('Request order: %s' % ArrivalClass.JobOrderIn)
         self.writeToConsole('Service order: %s\n\n\n' % ServerClass.JobOrderOut)
 
                 
@@ -152,12 +169,10 @@ class GUI(Tk):
         arrivalProcess = env.process(A.GenerateArrivals(env, inputInstance.valuesList[0], 'Poisson',\
                                 inputInstance.valuesList[1], inputInstance.distList[1],\
                                 inputInstance.valuesList[2], resource))
-
-        #ArrivalClass.m.observe(0)        # number in system is 0 at the start
         
         # Start processes
         env.run(until=inputInstance.valuesList[3])
-        self.DisplayData()
+        self.displayAverageData()
         self.updateStatusBar("Simulation complete.")
 
 
@@ -371,14 +386,10 @@ class ArrivalClass(object):
         self.env = env
         self.master = master
 
-        #ArrivalClass.m = Monitor() # monitor for number of jobs
-        #ArrivalClass.mT = Monitor() # monitor for time in system
-        #ArrivalClass.msT = Monitor() # monitor for generated service times
-
-        # reset monitors 
-        #ArrivalClass.m.reset()
-        #ArrivalClass.mT.reset()
-        #ArrivalClass.msT.reset()   
+	NumJobs = []
+	TimeSys = []
+	ProcTime = []
+	PercError = [] 
     
         self.ctr = 0
 
@@ -394,7 +405,7 @@ class ArrivalClass(object):
 
     def AddJobToFile(self, job):
         text = str(job.name) + "," + str(job.arrivalTime) + "," + str(job.realRemainingProcTime) + "," + \
-            str(job.estimatedRemainingProcTime) + "\n"
+            str(job.estimatedRemainingProcTime) + "," + str(job.procTime) + "," + str(job.percentError) + "\n"
         
         with open("SRPTE_Queue.txt", "a") as myFile:
             myFile.write(text)
@@ -403,7 +414,7 @@ class ArrivalClass(object):
     def SortQueueFile(self):
         with open("SRPTE_Queue.txt", "r") as myFile:
             csv1 = csv.reader(myFile, delimiter=',')
-            sort = sorted(csv1, key=operator.itemgetter(3)) #sort by 4th column (starts at 0)
+            sort = sorted(csv1, key=operator.itemgetter(3)) #sort by 4th column (Estimated remaining proc time)
             myFile.close()
 
         with open("SRPTE_Queue.txt", "w") as myFile:
@@ -426,7 +437,6 @@ class ArrivalClass(object):
             # add job to queue
             self.AddJobToFile(J)
             ArrivalClass.JobOrderIn.append(J.name)
-            #ServerClass.Queue.append(J)
 
             GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %s"%(self.env.now, J.name, J.estimatedRemainingProcTime))
 
@@ -434,14 +444,13 @@ class ArrivalClass(object):
             # INTERRUPT JOB IN SERVICE (if there is one), AND RE-SORT QUEUE
             if G.resourceBusy:
                 serverProcess.interrupt(J)
+	    else:
+		self.SortQueueFile()
 
             S = ServerClass(self.env, self.master)
             serverProcess = env.process(S.ExecuteJobs(server))              
 
             self.ctr += 1
-
-                # sort queue
-                #self.SortQueueFile()
 
 
 #----------------------------------------------------------------------#
@@ -459,8 +468,9 @@ class JobClass(object):
         self.priority = 0
         self.realRemainingProcTime = 0
         self.estimatedRemainingProcTime = 0
+	self.percentError = 0
 
-    # dictionary of service distributions
+    # Dictionary of service distributions
     def SetServiceDist(self, procRate, procDist):
         self.ServiceDistributions =  {
             'Exponential': self.SetExponDist,
@@ -484,13 +494,13 @@ class JobClass(object):
             main.customEquation = self.popup.stringEquation
         return eval(main.customEquation)
 
-    # generates a percent error for processing time
+    # Generates a percent error for processing time
     def GenerateError(self, percError):
         self.percentError = pow(-1, random.randint(0,1)) * (percError * random.random())
         return self.percentError
 
+    # Sets all processing times for job
     def SetJobAttributes(self, procRate, procDist, percError):
-        # generate processing time for the job
         self.procTime = self.SetServiceDist(procRate, procDist)
         self.estimatedProcTime = (1 + (self.GenerateError(percError)/100.0))*self.procTime
         self.realRemainingProcTime = self.procTime
@@ -526,8 +536,10 @@ class ServerClass(object):
         job.arrivalTime = float(firstRow[1])
         job.realRemainingProcTime = float(firstRow[2])
         job.estimatedRemainingProcTime = float(firstRow[3])
+	job.procTime = float(firstRow[4])
+	job.percentError = float(firstRow[5])
         job.priority = job.estimatedRemainingProcTime      # Priority is negative of estimated remaining processing time, \
-                                    # less processing time remaining equals higher priority
+                                    			   # less processing time remaining equals higher priority
         return job
 
     def RemoveFirstJobQueued(self):
@@ -541,7 +553,6 @@ class ServerClass(object):
 
     def ExecuteJobs(self, server):
         ServerClass.NumJobsInSys += 1
-        #ArrivalClass.m.observe(ServerClass.NumJobsInSys)
 
         # first job in queue requests service
         Job = self.GetFirstJobQueued()
@@ -549,6 +560,7 @@ class ServerClass(object):
         # This "with" statement automatically releases the resource when it has completed its job
         with server.request(priority=Job.priority, preempt=True) as req:
             GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated proc time = %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
+            
             try:
                 yield req # request server
             except simpy.Interrupt:
@@ -558,7 +570,7 @@ class ServerClass(object):
             G.resourceBusy = True
             serviceStartTime = self.env.now
             GUI.writeToConsole(self.master, "%.6f | %s server request granted"%(self.env.now, Job.name))
-            #ArrivalClass.msT.observe(Job.realRemainingProcTime)
+
             try:
                 yield self.env.timeout(Job.realRemainingProcTime)  # process job according to REAL processing time
 
@@ -569,25 +581,31 @@ class ServerClass(object):
                 self.RemoveFirstJobQueued() 
 
                 ServerClass.NumJobsInSys -= 1
-                #ArrivalClass.m.observe(ServerClass.NumJobsInSys)
-                #ArrivalClass.mT.observe(now - Job.arrivalTime)
+
+		NumJobs.append(ServerClass.NumJobsInSys)
+		TimeSys.append(self.env.now - Job.arrivalTime)
+		ProcTime.append(Job.procTime)
+		PercError.append(abs(Job.percentError)) # only take absolute value of error
         
             # Interrupted, update values
             except simpy.Interrupt as interrupt:
-                #newJob = "newJob" #interrupt.cause.by 
-    
-                # Job has had some processing time (may not yet be complete), update values
                 serviceTime = self.env.now - serviceStartTime   
                 Job.realRemainingProcTime -= serviceTime
                 Job.estimatedRemainingProcTime -= serviceTime
                 Job.priority = Job.estimatedRemainingProcTime
 
-                GUI.writeToConsole(self.master, "%.6f | %s INTERRUPTED, rem proc time %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
+		# Update job data in file
+		# 1. Remove job from file
+		self.RemoveFirstJobQueued() 
+		# 2. Add updated job to file
+		self.arrivalInstance.AddJobToFile(Job)
 
-                #sort queue
+                # Sort queue
                 self.arrivalInstance.SortQueueFile()
 
-                #release current job in order to allow premption?
+                GUI.writeToConsole(self.master, "%.6f | %s INTERRUPTED, rem proc time %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
+
+                # Resource releases current job in order to allow premption
                 server.release(request=req)
 
 
