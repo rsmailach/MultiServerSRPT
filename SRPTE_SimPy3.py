@@ -14,7 +14,6 @@
 import simpy 
 from Tkinter import *
 from datetime import datetime
-#from math import exp, log, fabs
 import random
 import tkMessageBox
 import ttk
@@ -166,7 +165,7 @@ class GUI(Tk):
         resource = simpy.PreemptiveResource(env, capacity=1) 
         
         A = ArrivalClass(env, self)
-        arrivalProcess = env.process(A.GenerateArrivals(env, inputInstance.valuesList[0], 'Poisson',\
+        arrivalProcess = env.process(A.generateArrivals(env, inputInstance.valuesList[0], 'Poisson',\
                                 inputInstance.valuesList[1], inputInstance.distList[1],\
                                 inputInstance.valuesList[2], resource))
         
@@ -193,13 +192,6 @@ class Input(LabelFrame):
         self.processingRateInput = DoubleVar()
         self.percentErrorInput = DoubleVar()
         self.simLengthInput = DoubleVar()
-
-        self.approxSRPTE = IntVar()
-        self.SRPTE = IntVar()
-        self.PSBS = IntVar()
-        self.approxSRPTE.set(1)
-        self.SRPTE.set(1)
-        self.PSBS.set(1)
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -234,18 +226,17 @@ class Input(LabelFrame):
         self.comboBox_2.grid(row = 1, column = 3)
 
         # Simulate Button
-        self.simulateButton = Button(self, text = "SIMULATE", command = self.OnButtonClick)
+        self.simulateButton = Button(self, text = "SIMULATE", command = self.onButtonClick)
         self.simulateButton.grid(row = 7, columnspan = 4)
 
-    def OnButtonClick(self):
-        self.GetNumericValues()
-        self.GetDropDownValues()
-        self.GetCheckboxValues()
+    def onButtonClick(self):
+        self.getNumericValues()
+        self.getDropDownValues()
 
         # send to submit button in main
         self.simulateButton.event_generate("<<input_simulate>>")
 
-    def GetNumericValues(self):
+    def getNumericValues(self):
         arrivalRate = self.arrivalRateInput.get()
         processingRate = self.processingRateInput.get()
         percentError = self.percentErrorInput.get()
@@ -258,17 +249,12 @@ class Input(LabelFrame):
         Input.valuesList = [arrivalRate, processingRate, percentError, maxSimLength]
         return Input.valuesList
 
-    def GetDropDownValues(self):
+    def getDropDownValues(self):
         #if self.comboBox_1.get() == 'Select Distribution': print "Box 1 has to have a selection"
         if self.comboBox_2.get() == 'Select Distribution': GUI.writeToConsole(self.master, "You must select a distribution for the processing rate")
 
         Input.distList = ["", self.comboBox_2.get(), "", "", ""]
         return Input.distList
-
-    # gets 0 or 1 value for checkboxes
-    def GetCheckboxValues(self):
-        Input.simList = [self.approxSRPTE.get(), self.SRPTE.get(), self.PSBS.get()]
-        return Input.simList
 
 #----------------------------------------------------------------------#
 # Class: Output
@@ -287,18 +273,18 @@ class Output(LabelFrame):
         buttonFrame.pack(side=BOTTOM, padx=5, pady=5)
 
         # Clear Button
-        self.clearButton = Button(buttonFrame, text = "CLEAR ALL DATA", command = self.OnClearButtonClick)
+        self.clearButton = Button(buttonFrame, text = "CLEAR ALL DATA", command = self.onClearButtonClick)
         self.clearButton.grid(row = 2, column = 0)
         
         # Save Button
-        self.saveButton = Button(buttonFrame, text = "SAVE ALL DATA", command = self.OnSaveButtonClick)
+        self.saveButton = Button(buttonFrame, text = "SAVE ALL DATA", command = self.onSaveButtonClick)
         self.saveButton.grid(row=2, column=1)
 
-    def OnClearButtonClick(self):
+    def onClearButtonClick(self):
         # clear console
         self.clearButton.event_generate("<<output_clear>>")
 
-    def OnSaveButtonClick(self):
+    def onSaveButtonClick(self):
         # save data
         self.saveButton.event_generate("<<output_save>>")
 
@@ -394,7 +380,7 @@ class ArrivalClass(object):
         self.ctr = 0
 
     # Dictionary of arrival distributions
-    def SetArrivalDist(self, arrRate, arrDist):
+    def setArrivalDist(self, arrRate, arrDist):
         ArrivalDistributions = {
             'Poisson': random.expovariate(1.0/arrRate),
             'Exponential': random.expovariate(arrRate)
@@ -403,7 +389,7 @@ class ArrivalClass(object):
         }
         return ArrivalDistributions[arrDist]
 
-    def AddJobToFile(self, job):
+    def addJobToFile(self, job):
         text = str(job.name) + "," + str(job.arrivalTime) + "," + str(job.realRemainingProcTime) + "," + \
             str(job.estimatedRemainingProcTime) + "," + str(job.procTime) + "," + str(job.percentError) + "\n"
         
@@ -411,7 +397,7 @@ class ArrivalClass(object):
             myFile.write(text)
             myFile.close()
 
-    def SortQueueFile(self):
+    def sortQueueFile(self):
         with open("SRPTE_Queue.txt", "r") as myFile:
             csv1 = csv.reader(myFile, delimiter=',')
             sort = sorted(csv1, key=operator.itemgetter(3)) #sort by 4th column (Estimated remaining proc time)
@@ -425,17 +411,17 @@ class ArrivalClass(object):
             myFile.close()
             print "\n"
 
-    def GenerateArrivals(self, env, arrRate, arrDist, procRate, procDist, percError, server):
+    def generateArrivals(self, env, arrRate, arrDist, procRate, procDist, percError, server):
         while 1:
             # wait for arrival of next job
-            yield env.timeout(self.SetArrivalDist(arrRate, arrDist))
+            yield env.timeout(self.setArrivalDist(arrRate, arrDist))
 
             J = JobClass(self.env, self.master)
-            J.SetJobAttributes(procRate, procDist, percError)
+            J.setJobAttributes(procRate, procDist, percError)
             J.name = "Job%02d"%self.ctr
             
             # add job to queue
-            self.AddJobToFile(J)
+            self.addJobToFile(J)
             ArrivalClass.JobOrderIn.append(J.name)
 
             GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %s"%(self.env.now, J.name, J.estimatedRemainingProcTime))
@@ -445,10 +431,10 @@ class ArrivalClass(object):
             if G.resourceBusy:
                 serverProcess.interrupt(J)
 	    else:
-		self.SortQueueFile()
+		self.sortQueueFile()
 
             S = ServerClass(self.env, self.master)
-            serverProcess = env.process(S.ExecuteJobs(server))              
+            serverProcess = env.process(S.executeJobs(server))              
 
             self.ctr += 1
 
@@ -471,22 +457,22 @@ class JobClass(object):
 	self.percentError = 0
 
     # Dictionary of service distributions
-    def SetServiceDist(self, procRate, procDist):
+    def setServiceDist(self, procRate, procDist):
         self.ServiceDistributions =  {
-            'Exponential': self.SetExponDist,
-            'Uniform': self.SetUniformDist,
+            'Exponential': self.setExponDist,
+            'Uniform': self.setUniformDist,
             #'Normal': Rnd.normalvariate(self.ServiceRate)
-            'Custom': self.SetCustomDist
+            'Custom': self.setCustomDist
         }
         return self.ServiceDistributions[procDist](procRate)
 
-    def SetExponDist(self, procRate):
+    def setExponDist(self, procRate):
         return random.expovariate(procRate)
 
-    def SetUniformDist(self, procRate):
+    def setUniformDist(self, procRate):
         return random.uniform(0.0, procRate)
 
-    def SetCustomDist(self, procRate):
+    def setCustomDist(self, procRate):
         if main.timesClicked == 0:
             main.timesClicked += 1
             self.popup=CustomDist(self.master)
@@ -495,14 +481,14 @@ class JobClass(object):
         return eval(main.customEquation)
 
     # Generates a percent error for processing time
-    def GenerateError(self, percError):
+    def generateError(self, percError):
         self.percentError = pow(-1, random.randint(0,1)) * (percError * random.random())
         return self.percentError
 
     # Sets all processing times for job
-    def SetJobAttributes(self, procRate, procDist, percError):
-        self.procTime = self.SetServiceDist(procRate, procDist)
-        self.estimatedProcTime = (1 + (self.GenerateError(percError)/100.0))*self.procTime
+    def setJobAttributes(self, procRate, procDist, percError):
+        self.procTime = self.setServiceDist(procRate, procDist)
+        self.estimatedProcTime = (1 + (self.generateError(percError)/100.0))*self.procTime
         self.realRemainingProcTime = self.procTime
         self.estimatedRemainingProcTime = self.estimatedProcTime        
 
@@ -523,7 +509,7 @@ class ServerClass(object):
         self.master = master
         self.arrivalInstance = ArrivalClass(env, master)
 
-    def GetFirstJobQueued(self):
+    def getFirstJobQueued(self):
         with open('SRPTE_Queue.txt', 'r') as myFile:
             reader = csv.reader(myFile)
             firstRow = next(reader)
@@ -542,7 +528,7 @@ class ServerClass(object):
                                     			   # less processing time remaining equals higher priority
         return job
 
-    def RemoveFirstJobQueued(self):
+    def removeFirstJobQueued(self):
         with open('SRPTE_Queue.txt', 'r') as fin:
             data = fin.read().splitlines(True)
             fin.close()
@@ -550,12 +536,11 @@ class ServerClass(object):
             fout.writelines(data[1:])
             fout.close()
     
-
-    def ExecuteJobs(self, server):
+    def executeJobs(self, server):
         ServerClass.NumJobsInSys += 1
 
         # first job in queue requests service
-        Job = self.GetFirstJobQueued()
+        Job = self.getFirstJobQueued()
         
         # This "with" statement automatically releases the resource when it has completed its job
         with server.request(priority=Job.priority, preempt=True) as req:
@@ -578,7 +563,7 @@ class ServerClass(object):
                 G.resourceBusy = False
                 GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(self.env.now, Job.name))
                 ServerClass.JobOrderOut.append(Job.name)
-                self.RemoveFirstJobQueued() 
+                self.removeFirstJobQueued() 
 
                 ServerClass.NumJobsInSys -= 1
 
@@ -596,12 +581,12 @@ class ServerClass(object):
 
 		# Update job data in file
 		# 1. Remove job from file
-		self.RemoveFirstJobQueued() 
+		self.removeFirstJobQueued() 
 		# 2. Add updated job to file
-		self.arrivalInstance.AddJobToFile(Job)
+		self.arrivalInstance.addJobToFile(Job)
 
                 # Sort queue
-                self.arrivalInstance.SortQueueFile()
+                self.arrivalInstance.sortQueueFile()
 
                 GUI.writeToConsole(self.master, "%.6f | %s INTERRUPTED, rem proc time %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
 
