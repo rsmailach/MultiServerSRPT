@@ -26,14 +26,7 @@ TimeSys = []
 ProcTime = []
 PercError = []
 
-#----------------------------------------------------------------------#
-# Class: G
-#
-# This class is used to store application globals.
-#
-#----------------------------------------------------------------------#
-class G: 
-    resourceBusy = False
+resourceBusy = False
 
 #----------------------------------------------------------------------#
 # Class: GUI
@@ -136,7 +129,7 @@ class GUI(Tk):
 	return var/len(List)
 
     def displayAverageData(self):
-	AvgNumJobs = float(sum(NumJobs))/len(NumJobs)
+	AvgNumJobs = int(float(sum(NumJobs))/len(NumJobs))
 	AvgTimeSys = float(sum(TimeSys))/len(TimeSys)
 	AvgProcTime = float(sum(ProcTime))/len(ProcTime)
 	VarProcTime = self.calcVariance(ProcTime, AvgProcTime)
@@ -428,7 +421,7 @@ class ArrivalClass(object):
 
 
             # INTERRUPT JOB IN SERVICE (if there is one), AND RE-SORT QUEUE
-            if G.resourceBusy:
+            if resourceBusy:
                 serverProcess.interrupt(J)
 	    else:
 		self.sortQueueFile()
@@ -545,14 +538,13 @@ class ServerClass(object):
         # This "with" statement automatically releases the resource when it has completed its job
         with server.request(priority=Job.priority, preempt=True) as req:
             GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated proc time = %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
-            
             try:
                 yield req # request server
             except simpy.Interrupt:
                 pass
                 
             # job is ready to start executing
-            G.resourceBusy = True
+            resourceBusy = True
             serviceStartTime = self.env.now
             GUI.writeToConsole(self.master, "%.6f | %s server request granted"%(self.env.now, Job.name))
 
@@ -560,7 +552,7 @@ class ServerClass(object):
                 yield self.env.timeout(Job.realRemainingProcTime)  # process job according to REAL processing time
 
                 # Job completed and released
-                G.resourceBusy = False
+                resourceBusy = False
                 GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(self.env.now, Job.name))
                 ServerClass.JobOrderOut.append(Job.name)
                 self.removeFirstJobQueued() 
