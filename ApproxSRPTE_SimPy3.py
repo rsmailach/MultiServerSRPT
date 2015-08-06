@@ -150,7 +150,7 @@ class GUI(Tk):
 
 		main.timesClicked = 0
 		env = simpy.Environment()
-       		resource = simpy.Resource(env, capacity=1) 
+       		resource = simpy.PriorityResource(env, capacity=1) 
 
 
 		A = ArrivalClass(env, self)
