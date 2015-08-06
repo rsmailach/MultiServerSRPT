@@ -360,6 +360,8 @@ class CustomDist(object):
 #
 #----------------------------------------------------------------------#
 class ArrivalClass(object):
+	PreviousJobs = []
+
 	def __init__(self, env, master):
 		self.env = env
 		self.master = master
@@ -370,6 +372,7 @@ class ArrivalClass(object):
 		PercError = [] 	
 	
 		self.ctr = 0
+		self.SortedPrevJobs = []
 
 	# Dictionary of arrival distributions
 	def setArrivalDist(self, arrRate, arrDist):
@@ -381,9 +384,47 @@ class ArrivalClass(object):
 		}
 		return ArrivalDistributions[arrDist]
 
-	def sortQueue(self, numClasses):
+	def sortQueue(self, numClasses, currentJob):
 		#grab the previous m (splitMech = numClasses - 1) jobs to sort jobs by estimated processing time (procTime) 
-		ServerClass.Queue[-(numClasses):] = sorted(ServerClass.Queue[-(numClasses):], key=lambda JobClass: JobClass.estimatedProcTime) 
+		#ServerClass.Queue[-(numClasses):] = sorted(ServerClass.Queue[-(numClasses):], key=lambda JobClass: JobClass.estimatedProcTime) 
+		
+		# Sort previous m jobs to find out where to insert ours
+		self.SortedPrevJobs = ArrivalClass.PreviousJobs
+		self.SortedPrevJobs.append(currentJob)
+
+		#self.SortedPrevJobs = sorted(self.SortedPrevJobs, key=lambda JobClass: JobClass.estimatedProcTime)
+		self.SortedPrevJobs.sort(key=lambda JobClass: JobClass.estimatedProcTime)
+		
+		counter = 1
+		for job in self.SortedPrevJobs:
+			job.priority = counter
+			counter += 1
+
+		# Get job duplicates
+		#prevJobs_names = set(job.name for job in SortedPrevJobs) # Get all names of jobs in SortedPrevJobs
+		#intersect = list(job for job in ServerClass.Queue if job.name in prevJobs_names) # by job names		
+	
+		# Update priority of jobs in Queue
+		for job in self.SortedPrevJobs:
+			for j in ServerClass.Queue:
+				if job.name == j.name:
+					j.priority = job.priority
+
+		# Add/Update the PrevJobs that have not yet been processed to the Queue (really only adds current job)
+		#prevJobs_names = set(job.name for job in self.SortedPrevJobs) # Get all names of jobs in SortedPrevJobs
+		#JobNamesNotYetProcessed = list(jobName for jobName in prevJobs_names if jobName not in ServerClass.JobOrderOut)
+		for job in list(self.SortedPrevJobs): #iterate over copy, so as can modify the original
+			for jobName in ServerClass.JobOrderOut:
+				if job.name == jobName:
+					self.SortedPrevJobs.remove(job)
+					
+		# Union the two lists together
+		ServerClass.Queue = list(set(self.SortedPrevJobs) | set(ServerClass.Queue))
+
+		# Sort Queue by priority
+		ServerClass.Queue.sort(key=lambda JobClass: JobClass.priority)
+			
+		# insert job into queue
 		return ServerClass.Queue
 	
 	def generateArrivals(self, env, arrRate, arrDist, procRate, procDist, percError, numClasses, server):
@@ -396,13 +437,20 @@ class ArrivalClass(object):
 			J.name = "Job%02d"%self.ctr
 			
 			# add job to queue
-			ServerClass.Queue.append(J)
+			#ServerClass.Queue.append(J)
 
 			GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %s"%(self.env.now, J.name, J.estimatedProcTime))
-			#GUI.writeToConsole(self.master, "\nREMAINING QUEUE LENGTH: %d "%len(ServerClass.Queue) + str([job.name for job in ServerClass.Queue]))
 
-			# sort jobs
-			self.sortQueue(numClasses)
+			# Remove oldest job from "Previous Jobs list
+			if len(ArrivalClass.PreviousJobs) > (numClasses):
+				ArrivalClass.PreviousJobs.pop(0)
+
+			#for item in ArrivalClass.PreviousJobs:
+			#	print item.name + ', ' + str(item.priority)
+			#print '\n'
+
+			# sort jobs into classes, add job to queue
+			self.sortQueue(numClasses, J)
 
 			S = ServerClass(self.env, self.master)
 			serverProcess = env.process(S.executeJobs(server))
@@ -481,8 +529,8 @@ class ServerClass(object):
 
 		# first job in queue requests service
 		# "with" statement automatically releases the resource when it has completed its job
-        	with server.request() as req:
-			GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated proc time = %s"%(self.env.now, ServerClass.Queue[0].name, ServerClass.Queue[0].estimatedProcTime))
+        	with server.request(priority=ServerClass.Queue[0].priority) as req:
+			GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated proc time = %s, class %s"%(self.env.now, ServerClass.Queue[0].name, ServerClass.Queue[0].estimatedProcTime, ServerClass.Queue[0].priority))
 			yield req
 		
 			# job is removed from queue, ready to start executing
@@ -494,7 +542,7 @@ class ServerClass(object):
 
 			# job completed and released
 			GUI.writeToConsole(self.master, "%.6f | %s COMPLETED"%(self.env.now, Job.name))
-			ServerClass.JobOrderOut.append(Job.name)	
+			ServerClass.JobOrderOut.append(Job.name)
 
 		ServerClass.NumJobsInSys -= 1
 
