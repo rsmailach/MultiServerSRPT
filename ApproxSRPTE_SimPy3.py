@@ -98,6 +98,12 @@ class GUI(Tk):
 			file.write(text)
 			file.close()
 
+    	# Empty arrivals file at the begining of each simulation
+    	def clearSavedArrivals(self):
+		with open("Arrivals.txt", "w") as myFile:
+            		myFile.write('Job Name, Arrival Time, Real Processing Time, Estimated Processing Time' + '\n')
+	        myFile.close()
+
 	def clearConsole(self, event):
 		self.console.config(state=NORMAL) # make console editable
 		self.console.delete('1.0', END)
@@ -142,6 +148,7 @@ class GUI(Tk):
 
 	def submit(self, event):
 		self.updateStatusBar("Simulating...")
+		self.clearSavedArrivals()
 		inputInstance = Input(self)
 
 		self.printParams(inputInstance.valuesList[0], inputInstance.valuesList[1],\
@@ -372,7 +379,7 @@ class ArrivalClass(object):
 		PercError = [] 	
 	
 		self.ctr = 0
-		self.SortedPrevJobs = []
+		
 
 	# Dictionary of arrival distributions
 	def setArrivalDist(self, arrRate, arrDist):
@@ -384,11 +391,21 @@ class ArrivalClass(object):
 		}
 		return ArrivalDistributions[arrDist]
 
+	def saveArrivals(self, job):
+       		text = str(job.name) + "," + str(job.arrivalTime) + "," + str(job.realProcTime) + "," + \
+            		str(job.estimatedProcTime) + "\n"
+        
+        	with open("Arrivals.txt", "a") as myFile:
+            		myFile.write(text)
+            		myFile.close()
+
 	def sortQueue(self, numClasses, currentJob):
 		#grab the previous m (splitMech = numClasses - 1) jobs to sort jobs by estimated processing time (procTime) 
 		#ServerClass.Queue[-(numClasses):] = sorted(ServerClass.Queue[-(numClasses):], key=lambda JobClass: JobClass.estimatedProcTime) 
 		
+
 		# Sort previous m jobs to find out where to insert ours
+		self.SortedPrevJobs = []
 		self.SortedPrevJobs = ArrivalClass.PreviousJobs
 		self.SortedPrevJobs.append(currentJob)
 
@@ -399,24 +416,52 @@ class ArrivalClass(object):
 		for job in self.SortedPrevJobs:
 			job.priority = counter
 			counter += 1
+			print job.name + ', ' + str(job.priority)
+		print '\n'
 
 		# Get job duplicates
 		#prevJobs_names = set(job.name for job in SortedPrevJobs) # Get all names of jobs in SortedPrevJobs
 		#intersect = list(job for job in ServerClass.Queue if job.name in prevJobs_names) # by job names		
 	
 		# Update priority of jobs in Queue
-		for job in self.SortedPrevJobs:
+		for i in self.SortedPrevJobs:
 			for j in ServerClass.Queue:
-				if job.name == j.name:
-					j.priority = job.priority
+				if i.name == j.name:
+					j.priority = i.priority
 
 		# Add/Update the PrevJobs that have not yet been processed to the Queue (really only adds current job)
 		#prevJobs_names = set(job.name for job in self.SortedPrevJobs) # Get all names of jobs in SortedPrevJobs
 		#JobNamesNotYetProcessed = list(jobName for jobName in prevJobs_names if jobName not in ServerClass.JobOrderOut)
-		for job in list(self.SortedPrevJobs): #iterate over copy, so as can modify the original
-			for jobName in ServerClass.JobOrderOut:
+		#tempList = copy(self.SortedPrevJobs)
+		#for job in tempList: #iterate over copy, so as can modify the original
+		#	for jobName in ServerClass.JobOrderOut:
+		#		if job.name == jobName:
+		#			self.SortedPrevJobs.remove(job)
+		
+
+		# Remove any jobs that are in the sorted previous jobs list that have already been completed as they should
+		# not be re-added to the queue when we do the union
+		i = 0
+		while i < len(self.SortedPrevJobs):
+			j = 0
+			while j < len(ServerClass.JobOrderOut):
+				try: 
+					job = self.SortedPrevJobs[i]
+					jobName = ServerClass.JobOrderOut[j]
+				except IndexError: #Only happens if removed last item in list
+					break
+
+			
+				# If job is removed, do not increment SortedPrevJobs, as each job will shift down one index
 				if job.name == jobName:
 					self.SortedPrevJobs.remove(job)
+					continue # restart j while loop without incrementing i
+				else:
+					j += 1
+			i += 1
+				
+				
+			
 					
 		# Union the two lists together
 		ServerClass.Queue = list(set(self.SortedPrevJobs) | set(ServerClass.Queue))
@@ -435,19 +480,21 @@ class ArrivalClass(object):
 			J = JobClass(self.env, self.master)
 			J.setJobAttributes(procRate, procDist, percError)
 			J.name = "Job%02d"%self.ctr
-			
-			# add job to queue
-			#ServerClass.Queue.append(J)
 
 			GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %s"%(self.env.now, J.name, J.estimatedProcTime))
 
+			# Save job to arrivals file
+			self.saveArrivals(J)
+
 			# Remove oldest job from "Previous Jobs list
-			if len(ArrivalClass.PreviousJobs) > (numClasses):
+			while len(ArrivalClass.PreviousJobs) > (numClasses):
+				print 'removing job: %s\n'%ArrivalClass.PreviousJobs[0].name
 				ArrivalClass.PreviousJobs.pop(0)
 
-			#for item in ArrivalClass.PreviousJobs:
-			#	print item.name + ', ' + str(item.priority)
-			#print '\n'
+			print 'Prev Jobs::::::::::::::::::::::::::::::::::::::::, Arriving Job: %s'%J.name
+			for item in ArrivalClass.PreviousJobs:
+				print 'Prev: ' + item.name + ', ' + str(item.priority)
+			print '\n'
 
 			# sort jobs into classes, add job to queue
 			self.sortQueue(numClasses, J)
@@ -455,10 +502,14 @@ class ArrivalClass(object):
 			S = ServerClass(self.env, self.master)
 			serverProcess = env.process(S.executeJobs(server))
 
+			# Prepare for next iteration
+			# Add arriving job to previous jobs
+			ArrivalClass.PreviousJobs.append(J)
+
 			self.ctr += 1
 
 
-#---------------------------------------------------------------------#
+#----------------------------------------------------------------------#
 # Class: JobClass
 #
 # This class is used to define jobs.
@@ -530,7 +581,7 @@ class ServerClass(object):
 		# first job in queue requests service
 		# "with" statement automatically releases the resource when it has completed its job
         	with server.request(priority=ServerClass.Queue[0].priority) as req:
-			GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated proc time = %s, class %s"%(self.env.now, ServerClass.Queue[0].name, ServerClass.Queue[0].estimatedProcTime, ServerClass.Queue[0].priority))
+			GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated proc time = %.4f, class %s"%(self.env.now, ServerClass.Queue[0].name, ServerClass.Queue[0].estimatedProcTime, ServerClass.Queue[0].priority))
 			yield req
 		
 			# job is removed from queue, ready to start executing
