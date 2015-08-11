@@ -113,7 +113,7 @@ class GUI(Tk):
 		self.statusText.set(text)
 
 	def printIntro(self):
-		self.writeToConsole("Approximate SRPTE \n\n This application simulates a single server with Poisson arrivals and 			processing times of a general distribution. Each arrival has an estimation error within a percent error taken as 			input. Arrivals are assigned to SRPT classes using the methods described in Adaptive and Scalable Comparison 			Scheduling.")
+		self.writeToConsole("Approximate SRPTE \n\n This application simulates a single server with Poisson arrivals and processing times of a general distribution. Each arrival has an estimation error within a percent error taken as input. Arrivals are assigned to SRPT classes using the methods described in Adaptive and Scalable Comparison Scheduling.")
 
 	def printParams(self, arrRate, procRate, percError, numClasses, simLength):
 		self.writeToConsole("--------------------------------------------------------------------------------")
@@ -149,6 +149,12 @@ class GUI(Tk):
 	def submit(self, event):
 		self.updateStatusBar("Simulating...")
 		self.clearSavedArrivals()
+
+		# Clear before re-running simulation
+		ServerClass.NumJobsInSys = 0
+		ServerClass.CompletedJobs = 0
+		ServerClass.Queue = []
+		ServerClass.JobOrderOut = []
 		inputInstance = Input(self)
 
 		self.printParams(inputInstance.valuesList[0], inputInstance.valuesList[1],\
@@ -189,6 +195,11 @@ class Input(LabelFrame):
 		self.numberOfClassesInput = IntVar()
 		self.simLengthInput = DoubleVar()
 
+		self.arrivalRateInput.set(5.0) ##################################CHANGE LATER
+		self.processingRateInput.set(1.0)
+		self.numberOfClassesInput.set(2) ##################################CHANGE LATER
+		self.simLengthInput.set(111.0) ##################################CHANGE LATER
+
 		self.grid_columnconfigure(0, weight=1)
 		self.grid_rowconfigure(0, weight=1)
 
@@ -228,7 +239,6 @@ class Input(LabelFrame):
 		self.comboBox_2.current(1) # set default selection 					#####################CHANGE LATER
 		self.comboBox_2.grid(row = 1, column = 3)
 
-
 	def onButtonClick(self):
 		self.getNumericValues()
 		self.getDropDownValues()
@@ -245,7 +255,8 @@ class Input(LabelFrame):
 
 		if arrivalRate <= 0.0: tkMessageBox.showerror("Input Error", "Arrival rate must be non-zero value!")
 		if processingRate <= 0.0: tkMessageBox.showerror("Input Error", "Processing rate must be non-zero value!")
-		if maxSimLength <= 0.0: tkMessageBox.showerror("Input Error", "imulation length must be non-zero value!")
+		if numberOfClasses <= 0.0: tkMessageBox.showerror("Input Error", "You must have at least one class!")
+		if maxSimLength <= 0.0: tkMessageBox.showerror("Input Error", "Simulation length must be non-zero value!")
 
 		Input.valuesList = [arrivalRate, processingRate, percentError, numberOfClasses, maxSimLength]
 		return Input.valuesList
@@ -299,8 +310,9 @@ class Output(LabelFrame):
 #----------------------------------------------------------------------#
 class CustomDist(object):
 	def __init__(self, master):
+		# Window settings
 		top = self.top = Toplevel(master)
-		top.geometry("500x200")                     # set window size
+		top.geometry("500x200")
 		top.resizable(0,0)
 
 		self.function = StringVar()
@@ -380,7 +392,6 @@ class ArrivalClass(object):
 	
 		self.ctr = 0
 		
-
 	# Dictionary of arrival distributions
 	def setArrivalDist(self, arrRate, arrDist):
 		ArrivalDistributions = {
@@ -400,44 +411,22 @@ class ArrivalClass(object):
             		myFile.close()
 
 	def sortQueue(self, numClasses, currentJob):
-		#grab the previous m (splitMech = numClasses - 1) jobs to sort jobs by estimated processing time (procTime) 
-		#ServerClass.Queue[-(numClasses):] = sorted(ServerClass.Queue[-(numClasses):], key=lambda JobClass: JobClass.estimatedProcTime) 
-		
-
-		# Sort previous m jobs to find out where to insert ours
+		# Sort previous current job with previous jobs
 		self.SortedPrevJobs = []
-		self.SortedPrevJobs = ArrivalClass.PreviousJobs
+		self.SortedPrevJobs = list(ArrivalClass.PreviousJobs)
 		self.SortedPrevJobs.append(currentJob)
-
-		#self.SortedPrevJobs = sorted(self.SortedPrevJobs, key=lambda JobClass: JobClass.estimatedProcTime)
 		self.SortedPrevJobs.sort(key=lambda JobClass: JobClass.estimatedProcTime)
 		
 		counter = 1
 		for job in self.SortedPrevJobs:
 			job.priority = counter
 			counter += 1
-			print job.name + ', ' + str(job.priority)
-		print '\n'
-
-		# Get job duplicates
-		#prevJobs_names = set(job.name for job in SortedPrevJobs) # Get all names of jobs in SortedPrevJobs
-		#intersect = list(job for job in ServerClass.Queue if job.name in prevJobs_names) # by job names		
 	
 		# Update priority of jobs in Queue
 		for i in self.SortedPrevJobs:
 			for j in ServerClass.Queue:
 				if i.name == j.name:
-					j.priority = i.priority
-
-		# Add/Update the PrevJobs that have not yet been processed to the Queue (really only adds current job)
-		#prevJobs_names = set(job.name for job in self.SortedPrevJobs) # Get all names of jobs in SortedPrevJobs
-		#JobNamesNotYetProcessed = list(jobName for jobName in prevJobs_names if jobName not in ServerClass.JobOrderOut)
-		#tempList = copy(self.SortedPrevJobs)
-		#for job in tempList: #iterate over copy, so as can modify the original
-		#	for jobName in ServerClass.JobOrderOut:
-		#		if job.name == jobName:
-		#			self.SortedPrevJobs.remove(job)
-		
+					j.priority = i.priority		
 
 		# Remove any jobs that are in the sorted previous jobs list that have already been completed as they should
 		# not be re-added to the queue when we do the union
@@ -450,7 +439,6 @@ class ArrivalClass(object):
 					jobName = ServerClass.JobOrderOut[j]
 				except IndexError: #Only happens if removed last item in list
 					break
-
 			
 				# If job is removed, do not increment SortedPrevJobs, as each job will shift down one index
 				if job.name == jobName:
@@ -461,8 +449,6 @@ class ArrivalClass(object):
 			i += 1
 				
 				
-			
-					
 		# Union the two lists together
 		ServerClass.Queue = list(set(self.SortedPrevJobs) | set(ServerClass.Queue))
 
@@ -486,15 +472,9 @@ class ArrivalClass(object):
 			# Save job to arrivals file
 			self.saveArrivals(J)
 
-			# Remove oldest job from "Previous Jobs list
-			while len(ArrivalClass.PreviousJobs) > (numClasses):
-				print 'removing job: %s\n'%ArrivalClass.PreviousJobs[0].name
+			# Remove oldest job from previous jobs list if there are too many
+			while len(ArrivalClass.PreviousJobs) > (numClasses - 1):
 				ArrivalClass.PreviousJobs.pop(0)
-
-			print 'Prev Jobs::::::::::::::::::::::::::::::::::::::::, Arriving Job: %s'%J.name
-			for item in ArrivalClass.PreviousJobs:
-				print 'Prev: ' + item.name + ', ' + str(item.priority)
-			print '\n'
 
 			# sort jobs into classes, add job to queue
 			self.sortQueue(numClasses, J)
@@ -586,14 +566,15 @@ class ServerClass(object):
 		
 			# job is removed from queue, ready to start executing
 			Job = ServerClass.Queue.pop(0)
+			ServerClass.JobOrderOut.append(Job.name)
 			GUI.writeToConsole(self.master, "%.6f | %s server request granted, begin executing"%(self.env.now, Job.name))
-		
+
 			# process job according to REAL processing time
 			yield self.env.timeout(Job.realProcTime)
 
 			# job completed and released
 			GUI.writeToConsole(self.master, "%.6f | %s COMPLETED"%(self.env.now, Job.name))
-			ServerClass.JobOrderOut.append(Job.name)
+
 
 		ServerClass.NumJobsInSys -= 1
 
