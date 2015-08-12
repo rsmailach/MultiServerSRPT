@@ -14,7 +14,7 @@
 import simpy
 from Tkinter import *
 from datetime import datetime
-from math import exp, log
+from math import exp, log, floor
 import random
 import ttk
 import tkMessageBox
@@ -39,23 +39,23 @@ class GUI(Tk):
 		self.statusText = StringVar()
 		random.seed(datetime.now())
 
-		# create the input frame
+		# Create the input frame
 		self.frameIn = Input(self)
 		#self.frameIn.grid(row = 0, column = 0, padx = 5, pady =5, ipadx = 5, ipady = 5)
 		self.frameIn.pack(side=TOP, fill=BOTH, padx = 5, pady =5, ipadx = 5, ipady = 5)		
 
-		# create the output frame
+		# Create the output frame
 		self.frameOut = Output(self)
 		#self.frameOut.grid(row = 1, column = 0, padx = 5, pady =5, ipadx = 5, ipady = 5)
 		self.frameOut.pack(side=TOP, fill=BOTH, padx = 5, pady =5, ipadx = 5, ipady = 5)
 
-		# bind simulate button
+		# Bind simulate button
 		self.bind("<<input_simulate>>", self.submit)
 
-		# bind save button
+		# Bind save button
 		self.bind("<<output_save>>", self.saveData)
 
-		# bind clear button
+		# Bind clear button
 		self.bind("<<output_clear>>", self.clearConsole)
 
 		# Status Bar
@@ -63,7 +63,7 @@ class GUI(Tk):
 		#status.grid(row=10, column=0, columnspan=10) # row at very large number, so always at bottom
 		status.pack(side=BOTTOM, anchor=W, fill=X)		
 
-		# initialize console
+		# Initialize console
 		self.makeConsole()
 		self.printIntro()
 		self.updateStatusBar("Waiting for submit...")
@@ -86,7 +86,7 @@ class GUI(Tk):
 		self.console.config(state=DISABLED) # disable (non-editable) console
 
 	def saveData(self, event):
-		# get filename
+		# Get filename
 		filename = tkFileDialog.asksaveasfilename(title="Save as...", defaultextension='.txt')
 		
 		if filename:
@@ -184,8 +184,6 @@ class GUI(Tk):
 #
 #----------------------------------------------------------------------#
 class Input(LabelFrame):
-	#valuesList = []
-
 	def __init__(self, master):
 		LabelFrame.__init__(self, master, text = "Input")
 		self.master = master
@@ -194,11 +192,12 @@ class Input(LabelFrame):
 		self.percentErrorInput = DoubleVar()
 		self.numberOfClassesInput = IntVar()
 		self.simLengthInput = DoubleVar()
+		self.errorMessage = StringVar()
 
-		self.arrivalRateInput.set(5.0) ##################################CHANGE LATER
-		self.processingRateInput.set(1.0)
-		self.numberOfClassesInput.set(4) ##################################CHANGE LATER
-		self.simLengthInput.set(211.0) ##################################CHANGE LATER
+		self.arrivalRateInput.set(2.0)		##################################CHANGE LATER
+		self.processingRateInput.set(0.5)	##################################CHANGE LATER
+		self.numberOfClassesInput.set(4)	##################################CHANGE LATER
+		self.simLengthInput.set(111.0)		##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=1)
 		self.grid_rowconfigure(0, weight=1)
@@ -210,6 +209,8 @@ class Input(LabelFrame):
 		for elem in labels:
 			Label(self, text=elem).grid(row=r, column=c)
 			r=r+1
+
+		Label(self, textvariable=self.errorMessage, fg="red", font=14).grid(row=5, columnspan=4)
 		Label(self, text=u"\u00B1").grid(row=2, column=1)
 
 		# Entry Boxes
@@ -224,11 +225,9 @@ class Input(LabelFrame):
 		self.entry_4.grid(row = 3, column = 2)
 		self.entry_5.grid(row = 4, column = 2)
 
-
-
 		# Simulate Button
 		self.simulateButton = Button(self, text = "SIMULATE", command = self.onButtonClick)
-		self.simulateButton.grid(row = 5, columnspan = 4)
+		self.simulateButton.grid(row = 6, columnspan = 4)
 
 		# Distribution Dropdowns
 		self.distributions = ('Select Distribution', 'Exponential', 'Uniform', 'Custom')
@@ -236,37 +235,56 @@ class Input(LabelFrame):
 		#self.comboBox_1.current(0) # set selection
 		#self.comboBox_1.grid(row = 0, column = 2)
 		self.comboBox_2 = ttk.Combobox(self, values = self.distributions, state = 'readonly')
-		self.comboBox_2.current(1) # set default selection 					#####################CHANGE LATER
+		self.comboBox_2.current(1) # set default selection 				#####################CHANGE LATER
 		self.comboBox_2.grid(row = 1, column = 3)
 
 	def onButtonClick(self):
-		self.getNumericValues()
-		self.getDropDownValues()
-
-		# send to submit button in main
-		self.simulateButton.event_generate("<<input_simulate>>")
+		if (self.getNumericValues() == 0) and (self.getDropDownValues() == 0):
+			# Send to submit button in main	
+			self.simulateButton.event_generate("<<input_simulate>>")
 
 	def getNumericValues(self):
-		arrivalRate = self.arrivalRateInput.get()
-		processingRate = self.processingRateInput.get()
-		percentError = self.percentErrorInput.get()
-		numberOfClasses = self.numberOfClassesInput.get()
-		maxSimLength = self.simLengthInput.get()
-
-		if arrivalRate <= 0.0: tkMessageBox.showerror("Input Error", "Arrival rate must be non-zero value!")
-		if processingRate <= 0.0: tkMessageBox.showerror("Input Error", "Processing rate must be non-zero value!")
-		if numberOfClasses <= 0.0: tkMessageBox.showerror("Input Error", "You must have at least one class!")
-		if maxSimLength <= 0.0: tkMessageBox.showerror("Input Error", "Simulation length must be non-zero value!")
-
-		Input.valuesList = [arrivalRate, processingRate, percentError, numberOfClasses, maxSimLength]
-		return Input.valuesList
+		try:
+			arrivalRate = self.arrivalRateInput.get()
+			processingRate = self.processingRateInput.get()
+			percentError = self.percentErrorInput.get()
+			maxSimLength = self.simLengthInput.get()
+		except ValueError:
+			self.errorMessage.set("One of your inputs is an incorrect type, try again.")
+			return 1
+		try:
+			numberOfClasses = self.numberOfClassesInput.get()
+		except ValueError:
+			self.errorMessage.set("Number of classes must be an integer.")
+			return 1
+			
+		if arrivalRate <= 0.0: 
+			self.errorMessage.set("Arrival rate must be non-zero value!")
+			return 1
+		elif processingRate <= 0.0: 
+			self.errorMessage.set("Processing rate must be non-zero value!")
+			return 1
+		elif numberOfClasses <= 0.0: 
+			self.errorMessage.set("You must have at least one class!")
+			return 1
+		elif maxSimLength <= 0.0: 
+			self.errorMessage.set("Simulation length must be non-zero value!")
+			return 1
+		else:
+			self.errorMessage.set("")
+			Input.valuesList = [arrivalRate, processingRate, percentError, numberOfClasses, maxSimLength] 
+			return 0
 
 	def getDropDownValues(self):
 		#if self.comboBox_1.get() == 'Select Distribution': print "Box 1 has to have a selection"
-		if self.comboBox_2.get() == 'Select Distribution': GUI.writeToConsole(self.master, "You must select a distribution for the processing rate")
-
-		Input.distList = ["", self.comboBox_2.get(), "", "", ""]
-		return Input.distList
+		comboBox2Value = self.comboBox_2.get()
+		if comboBox2Value == 'Select Distribution': 
+			self.errorMessage.set("You must select a distribution for the processing rate")
+			return 1
+		else:
+			self.errorMessage.set("")
+			Input.distList = ["", comboBox2Value, "", "", ""]
+			return 0
 
 
 #----------------------------------------------------------------------#
@@ -294,11 +312,11 @@ class Output(LabelFrame):
 		self.saveButton.grid(row=2, column=1)
 
 	def onClearButtonClick(self):
-		# clear console
+		# Clear console
 		self.clearButton.event_generate("<<output_clear>>")
 
 	def onSaveButtonClick(self):
-		# save data
+		# Save data
 		self.saveButton.event_generate("<<output_save>>")
 
 
@@ -423,35 +441,7 @@ class ArrivalClass(object):
 				currentJob.priority = counter
 			counter += 1
 	
-		# Update priority of jobs in Queue ##DO NOT WANT THIS
-		#for i in self.SortedPrevJobs:
-		#	for j in ServerClass.Queue:
-		#		if i.name == j.name:
-		#			j.priority = i.priority		
-
-		# Remove any jobs that are in the sorted previous jobs list that have already been completed as they should
-		# not be re-added to the queue when we do the union
-		#i = 0
-		#while i < len(self.SortedPrevJobs):
-		#	j = 0
-		#	while j < len(ServerClass.JobOrderOut):
-		#		try: 
-		#			job = self.SortedPrevJobs[i]
-		#			jobName = ServerClass.JobOrderOut[j]
-		#		except IndexError: #Only happens if removed last item in list
-		#			break
-			
-				# If job is removed, do not increment SortedPrevJobs, as each job will shift down one index
-		#		if job.name == jobName:
-		#			self.SortedPrevJobs.remove(job)
-		#			continue # restart j while loop without incrementing i
-		#		else:
-		#			j += 1
-		#	i += 1
-				
-				
-		# Union the two lists together
-		#ServerClass.Queue = list(set(self.SortedPrevJobs) | set(ServerClass.Queue))
+		# Add current job with new priority to queue
 		ServerClass.Queue.append(currentJob)
 
 		# Sort Queue first by priority, then name
@@ -460,19 +450,17 @@ class ArrivalClass(object):
 			print '%s, %s'%(item.name, item.priority)
 		print '\n'
 			
-		# insert job into queue
+		# Insert job into queue
 		return ServerClass.Queue
 	
 	def generateArrivals(self, env, arrRate, arrDist, procRate, procDist, percError, numClasses, server):
 		while 1:
-			# wait for arrival of next job
+			# Wait for arrival of next job
 			yield env.timeout(self.setArrivalDist(arrRate, arrDist))
 
 			J = JobClass(self.env, self.master)
 			J.setJobAttributes(procRate, procDist, percError)
 			J.name = "Job%02d"%self.ctr
-
-			
 
 			# Save job to arrivals file
 			self.saveArrivals(J)
@@ -481,7 +469,7 @@ class ArrivalClass(object):
 			while len(ArrivalClass.PreviousJobs) > (numClasses - 1):
 				ArrivalClass.PreviousJobs.pop(0)
 
-			# sort jobs into classes, add job to queue
+			# Sort jobs into classes, add job to queue
 			self.sortQueue(numClasses, J)
 
 			GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %.4f, class %s"%(self.env.now, J.name, J.estimatedProcTime, J.priority))
@@ -509,7 +497,7 @@ class JobClass(object):
 		self.arrivalTime = self.env.now
 		self.realProcTime = 0
 
-	# dictionary of service distributions
+	# Dictionary of service distributions
 	def setServiceDist(self, procRate, procDist):
 		self.ServiceDistributions =  {
 			'Exponential': self.setExponDist,
@@ -535,13 +523,13 @@ class JobClass(object):
 
 
 
-	# generates a percent error for processing time
+	# Generates a percent error for processing time
 	def generateError(self, percError):
 		self.percentError = pow(-1, random.randint(0,1)) * (percError * random.random())
 		return self.percentError
 
 	def setJobAttributes(self, procRate, procDist, percError):
-		# generate processing time for the job
+		# Generate processing time for the job
 		self.realProcTime = self.setServiceDist(procRate, procDist)
 		self.estimatedProcTime = (1 + (self.generateError(percError)/100.0))*self.realProcTime			
 
@@ -565,21 +553,21 @@ class ServerClass(object):
 	def executeJobs(self, server):
 		ServerClass.NumJobsInSys += 1
 
-		# first job in queue requests service
+		# First job in queue requests service
 		# "with" statement automatically releases the resource when it has completed its job
         	with server.request(priority=ServerClass.Queue[0].priority) as req:
 			GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated proc time = %.4f, class %s"%(self.env.now, ServerClass.Queue[0].name, ServerClass.Queue[0].estimatedProcTime, ServerClass.Queue[0].priority))
 			yield req
 		
-			# job is removed from queue, ready to start executing
+			# Job is removed from queue, ready to start executing
 			Job = ServerClass.Queue.pop(0)
 			ServerClass.JobOrderOut.append(Job.name)
 			GUI.writeToConsole(self.master, "%.6f | %s server request granted, begin executing, class %s"%(self.env.now, Job.name, Job.priority))
 
-			# process job according to REAL processing time
+			# Process job according to REAL processing time
 			yield self.env.timeout(Job.realProcTime)
 
-			# job completed and released
+			# Job completed and released
 			GUI.writeToConsole(self.master, "%.6f | %s COMPLETED, class %s"%(self.env.now, Job.name, Job.priority))
 
 
@@ -593,10 +581,10 @@ class ServerClass(object):
 
 #----------------------------------------------------------------------#
 def main():
-	window = GUI(None)                          	# instantiate the class with no parent (None)
-	window.title('Single Server Approximate SRPT with Errors')  # title the window
+	window = GUI(None)                          			# instantiate the class with no parent (None)
+	window.title('Single Server Approximate SRPT with Errors')	# title the window
 
-	#global variables used in JobClass
+	#Global variables used in JobClass
 	main.timesClicked = 0		
 	main.customEquation = ""
 

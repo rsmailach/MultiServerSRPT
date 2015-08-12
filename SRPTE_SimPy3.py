@@ -42,28 +42,28 @@ class GUI(Tk):
         self.statusText = StringVar()
         random.seed(datetime.now())
 
-        # create the input frame
+        # Create the input frame
         self.frameIn = Input(self)
         self.frameIn.pack(side=TOP, fill=BOTH, padx = 5, pady =5, ipadx = 5, ipady = 5)     
 
-        # create the output frame
+        # Create the output frame
         self.frameOut = Output(self)
         self.frameOut.pack(side=TOP, fill=BOTH, padx = 5, pady =5, ipadx = 5, ipady = 5)
 
-        # bind simulate button
+        # Bind simulate button
         self.bind("<<input_simulate>>", self.submit)
 
-        # bind save button
+        # Bind save button
         self.bind("<<output_save>>", self.saveData)
 
-        # bind clear button
+        # Bind clear button
         self.bind("<<output_clear>>", self.clearConsole)
 
         # Status Bar
         status = Label(self.master, textvariable=self.statusText, bd=1, relief=SUNKEN, anchor=W)
         status.pack(side=BOTTOM, anchor=W, fill=X)      
 
-        # initialize console
+        # Initialize console
         self.makeConsole()
         self.printIntro()
         self.updateStatusBar("Waiting for submit...")
@@ -72,7 +72,7 @@ class GUI(Tk):
         consoleFrame = Frame(self.frameOut)
         consoleFrame.pack(side=TOP, padx=5, pady=5)
         self.console = Text(consoleFrame, wrap = WORD)
-        self.console.config(state=DISABLED) # start with console as disabled (non-editable)
+        self.console.config(state=DISABLED) 	# start with console as disabled (non-editable)
         scrollbar = Scrollbar(consoleFrame)
         scrollbar.config(command = self.console.yview)
         self.console.config(yscrollcommand=scrollbar.set)
@@ -80,13 +80,13 @@ class GUI(Tk):
         scrollbar.grid(column=1, row=0, sticky='NS')
 
     def writeToConsole(self, text = ' '):
-        self.console.config(state=NORMAL) # make console editable
+        self.console.config(state=NORMAL) 	# make console editable
         self.console.insert(END, '%s\n'%text)
         self.update()
-        self.console.config(state=DISABLED) # disable (non-editable) console
+        self.console.config(state=DISABLED) 	# disable (non-editable) console
 
     def saveData(self, event):
-        # get filename
+        # Get filename
         filename = tkFileDialog.asksaveasfilename(title="Save as...", defaultextension='.txt')
         
         if filename:
@@ -104,9 +104,9 @@ class GUI(Tk):
         open('SRPTE_Queue.txt', 'w').close()
 
     def clearConsole(self, event):
-        self.console.config(state=NORMAL) # make console editable
+        self.console.config(state=NORMAL) 	# make console editable
         self.console.delete('1.0', END)
-        self.console.config(state=DISABLED) # disable (non-editable) console
+        self.console.config(state=DISABLED) 	# disable (non-editable) console
 
     def updateStatusBar(self, text=' '):
         self.statusText.set(text)
@@ -176,8 +176,6 @@ class GUI(Tk):
 #
 #----------------------------------------------------------------------#
 class Input(LabelFrame):
-    #valuesList = []
-
     def __init__(self, master):
         LabelFrame.__init__(self, master, text = "Input")
         self.master = master
@@ -185,6 +183,11 @@ class Input(LabelFrame):
         self.processingRateInput = DoubleVar()
         self.percentErrorInput = DoubleVar()
         self.simLengthInput = DoubleVar()
+	self.errorMessage = StringVar()
+
+	self.arrivalRateInput.set(2.0)		##################################CHANGE LATER
+	self.processingRateInput.set(0.5)	##################################CHANGE LATER
+	self.simLengthInput.set(111.0)		##################################CHANGE LATER
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -196,6 +199,8 @@ class Input(LabelFrame):
         for elem in labels:
             Label(self, text=elem).grid(row=r, column=c)
             r=r+1
+	
+	Label(self, textvariable=self.errorMessage, fg="red", font=14).grid(row=5, columnspan=4)
         Label(self, text=u"\u00B1").grid(row=2, column=1)
 
         # Entry Boxes
@@ -220,34 +225,48 @@ class Input(LabelFrame):
 
         # Simulate Button
         self.simulateButton = Button(self, text = "SIMULATE", command = self.onButtonClick)
-        self.simulateButton.grid(row = 7, columnspan = 4)
+        self.simulateButton.grid(row = 6, columnspan = 4)
 
     def onButtonClick(self):
-        self.getNumericValues()
-        self.getDropDownValues()
+	if (self.getNumericValues() == 0) and (self.getDropDownValues() == 0):
+		# Send to submit button in main	
+		self.simulateButton.event_generate("<<input_simulate>>")
 
-        # send to submit button in main
-        self.simulateButton.event_generate("<<input_simulate>>")
 
     def getNumericValues(self):
-        arrivalRate = self.arrivalRateInput.get()
-        processingRate = self.processingRateInput.get()
-        percentError = self.percentErrorInput.get()
-        maxSimLength = self.simLengthInput.get()
+	try:
+        	arrivalRate = self.arrivalRateInput.get()
+	        processingRate = self.processingRateInput.get()
+        	percentError = self.percentErrorInput.get()
+        	maxSimLength = self.simLengthInput.get()
+	except ValueError:
+		self.errorMessage.set("One of your inputs is an incorrect type, try again.")
+		return 1
 
-        if arrivalRate <= 0.0: tkMessageBox.showerror("Input Error", "Arrival rate must be non-zero value!")
-        if processingRate <= 0.0: tkMessageBox.showerror("Input Error", "Processing rate must be non-zero value!")
-        if maxSimLength <= 0.0: tkMessageBox.showerror("Input Error", "imulation length must be non-zero value!")
-
-        Input.valuesList = [arrivalRate, processingRate, percentError, maxSimLength]
-        return Input.valuesList
+        if arrivalRate <= 0.0:
+		self.errorMessage.set("Arrival rate must be non-zero value!")
+		return 1
+        if processingRate <= 0.0:
+		self.errorMessage.set("Processing rate must be non-zero value!")
+		return 1
+        if maxSimLength <= 0.0:
+		self.errorMessage.set("Simulation length must be non-zero value!")
+		return 1
+	else:
+		self.errorMessage.set("")
+        	Input.valuesList = [arrivalRate, processingRate, percentError, maxSimLength]
+	        return 0
 
     def getDropDownValues(self):
         #if self.comboBox_1.get() == 'Select Distribution': print "Box 1 has to have a selection"
-        if self.comboBox_2.get() == 'Select Distribution': GUI.writeToConsole(self.master, "You must select a distribution for the processing rate")
-
-        Input.distList = ["", self.comboBox_2.get(), "", "", ""]
-        return Input.distList
+	comboBox2Value = self.comboBox_2.get()
+        if comboBox2Value == 'Select Distribution':
+		self.errorMessage.set("You must select a distribution for the processing rate")
+		return 1
+	else:
+		self.errorMessage.set("")
+       		Input.distList = ["", comboBox2Value, "", "", ""]
+        	return 0
 
 #----------------------------------------------------------------------#
 # Class: Output
@@ -274,11 +293,11 @@ class Output(LabelFrame):
         self.saveButton.grid(row=2, column=1)
 
     def onClearButtonClick(self):
-        # clear console
+        # Clear console
         self.clearButton.event_generate("<<output_clear>>")
 
     def onSaveButtonClick(self):
-        # save data
+        # Save data
         self.saveButton.event_generate("<<output_save>>")
 
 
@@ -302,7 +321,7 @@ class CustomDist(object):
         self.l=Label(frame1, text="Please enter the functional inverse of the distribution of your choice. \nExponential distribution is provided as an example. \nNote: x " + u"\u2265" + " 0", font=("Helvetica", 12), justify=LEFT)
         self.l.pack()
 
-        #Button frame
+        # Button frame
         frame2 = Frame(top)
         frame2.pack(side=TOP, padx=5, pady=5)
         self.mu=Button(frame2, text=u'\u03bc', command=self.insertMu)
@@ -406,14 +425,14 @@ class ArrivalClass(object):
 
     def generateArrivals(self, env, arrRate, arrDist, procRate, procDist, percError, server):
         while 1:
-            # wait for arrival of next job
+            # Wait for arrival of next job
             yield env.timeout(self.setArrivalDist(arrRate, arrDist))
 
             J = JobClass(self.env, self.master)
             J.setJobAttributes(procRate, procDist, percError)
             J.name = "Job%02d"%self.ctr
             
-            # add job to queue
+            # Add job to queue
             self.addJobToFile(J)
             ArrivalClass.JobOrderIn.append(J.name)
 
@@ -532,18 +551,18 @@ class ServerClass(object):
     def executeJobs(self, server):
         ServerClass.NumJobsInSys += 1
 
-        # first job in queue requests service
+        # First job in queue requests service
         Job = self.getFirstJobQueued()
         
         # This "with" statement automatically releases the resource when it has completed its job
         with server.request(priority=Job.priority, preempt=True) as req:
             GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated proc time = %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
             try:
-                yield req # request server
+                yield req 	# request server
             except simpy.Interrupt:
                 pass
                 
-            # job is ready to start executing
+            # Job is ready to start executing
             resourceBusy = True
             serviceStartTime = self.env.now
             GUI.writeToConsole(self.master, "%.6f | %s server request granted"%(self.env.now, Job.name))
@@ -597,7 +616,7 @@ def main():
     window = GUI(None)                              # instantiate the class with no parent (None)
     window.title('Single Server SRPT with Errors')  # title the window
 
-    #global variables used in JobClass
+    # Global variables used in JobClass
     main.timesClicked = 0       
     main.customEquation = ""
 
