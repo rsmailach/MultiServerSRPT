@@ -103,6 +103,12 @@ class GUI(Tk):
     def clearQueueFile(self):
         open('SRPTE_Queue.txt', 'w').close()
 
+    # Empty arrivals file at the begining of each simulation
+    def clearSavedArrivals(self):
+        with open("Arrivals.txt", "w") as myFile:
+            myFile.write('Job Name, Arrival Time, Real Processing Time, Estimated Processing Time, Amount Already Processed, Percent Error' + '\n')
+            myFile.close()
+
     def clearConsole(self, event):
         self.console.config(state=NORMAL) 	# make console editable
         self.console.delete('1.0', END)
@@ -135,14 +141,16 @@ class GUI(Tk):
 	VarProcTime = self.calcVariance(ProcTime, AvgProcTime)
 	AvgPercError = float(sum(PercError))/len(PercError)
 
-        self.writeToConsole('\n\nSINGLE SERVER SRPT')
         self.writeToConsole('Average number of jobs in the system %s' %AvgNumJobs)
         self.writeToConsole('Average time in system, from start to completion is %s' %AvgTimeSys)
         self.writeToConsole('Average processing time, based on generated service times is %s' %AvgProcTime)
         self.writeToConsole('Variance of processing time %s' %VarProcTime)
 	self.writeToConsole('Average percent error %.4f\n' %AvgPercError)
         #self.writeToConsole('Request order: %s' % ArrivalClass.JobOrderIn)
-        self.writeToConsole('Service order: %s\n\n\n' % ServerClass.JobOrderOut)
+        self.writeToConsole('Service order: %s\n\n' % ServerClass.JobOrderOut)
+        self.writeToConsole("--------------------------------------------------------------------------------")
+	self.writeToConsole('NOTE: THERE ARE STILL ERRORS WHEN RUNING MULTIPLE SIMULATIONS WITHOUT FIRST QUITTING THE APPLICATION.')
+        self.writeToConsole("--------------------------------------------------------------------------------\n\n\n")
 
                 
     def submit(self, event):
@@ -409,6 +417,14 @@ class ArrivalClass(object):
             myFile.write(text)
             myFile.close()
 
+    def saveArrivals(self, job):
+        text = str(job.name) + "," + str(job.arrivalTime) + "," + str(job.realRemainingProcTime) + "," + \
+            str(job.estimatedRemainingProcTime) + "," + str(job.procTime) + "," + str(job.percentError) + "\n"
+        
+        with open("Arrivals.txt", "a") as myFile:
+            myFile.write(text)
+            myFile.close()
+
     def sortQueueFile(self):
         with open("SRPTE_Queue.txt", "r") as myFile:
             csv1 = csv.reader(myFile, delimiter=',')
@@ -431,6 +447,9 @@ class ArrivalClass(object):
             J = JobClass(self.env, self.master)
             J.setJobAttributes(procRate, procDist, percError)
             J.name = "Job%02d"%self.ctr
+
+            # Save job to arrivals file
+            self.saveArrivals(J)
             
             # Add job to queue
             self.addJobToFile(J)
@@ -603,13 +622,6 @@ class ServerClass(object):
 
                 # Resource releases current job in order to allow premption
                 server.release(request=req)
-
-
-        
-
-
-
-
 
 #----------------------------------------------------------------------#
 def main():
