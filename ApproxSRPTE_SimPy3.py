@@ -137,14 +137,16 @@ class GUI(Tk):
 		VarProcTime = self.calcVariance(ProcTime, AvgProcTime)
 		AvgPercError = float(sum(PercError))/len(PercError)
 
-		self.writeToConsole('\n\nSINGLE SERVER SRPT')
 		self.writeToConsole('Average number of jobs in the system %s' %AvgNumJobs)
 		self.writeToConsole('Average time in system, from start to completion is %s' %AvgTimeSys)
 		self.writeToConsole('Average processing time, based on generated service times is %s' %AvgProcTime)
 		self.writeToConsole('Variance of processing time %s' %VarProcTime)
 		self.writeToConsole('Average percent error %.4f\n' %AvgPercError)
 		#self.writeToConsole('Request order: %s' % ArrivalClass.JobOrderIn)
-		self.writeToConsole('Service order: %s\n\n\n' % ServerClass.JobOrderOut)
+		self.writeToConsole('Service order: %s\n\n' % ServerClass.JobOrderOut)
+     		self.writeToConsole("--------------------------------------------------------------------------------")
+	     	self.writeToConsole('NOTE: THERE ARE STILL ERRORS WHEN RUNING MULTIPLE SIMULATIONS WITHOUT FIRST QUITTING THE APPLICATION.')
+     		self.writeToConsole("--------------------------------------------------------------------------------\n\n\n")
 
 	def submit(self, event):
 		self.updateStatusBar("Simulating...")
@@ -422,7 +424,7 @@ class ArrivalClass(object):
 
 	def saveArrivals(self, job):
        		text = str(job.name) + "," + str(job.arrivalTime) + "," + str(job.realProcTime) + "," + \
-            		str(job.estimatedProcTime) + "\n"
+            		str(job.estimatedProcTime) + "," + str(job.percentError) + "\n"
         
         	with open("Arrivals.txt", "a") as myFile:
             		myFile.write(text)
