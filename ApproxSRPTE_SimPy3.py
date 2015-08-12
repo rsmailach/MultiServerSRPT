@@ -197,8 +197,8 @@ class Input(LabelFrame):
 
 		self.arrivalRateInput.set(5.0) ##################################CHANGE LATER
 		self.processingRateInput.set(1.0)
-		self.numberOfClassesInput.set(2) ##################################CHANGE LATER
-		self.simLengthInput.set(111.0) ##################################CHANGE LATER
+		self.numberOfClassesInput.set(4) ##################################CHANGE LATER
+		self.simLengthInput.set(211.0) ##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=1)
 		self.grid_rowconfigure(0, weight=1)
@@ -413,47 +413,52 @@ class ArrivalClass(object):
 	def sortQueue(self, numClasses, currentJob):
 		# Sort previous current job with previous jobs
 		self.SortedPrevJobs = []
-		self.SortedPrevJobs = list(ArrivalClass.PreviousJobs)
-		self.SortedPrevJobs.append(currentJob)
+		self.SortedPrevJobs = list(ArrivalClass.PreviousJobs) 	# copy of prev jobs
+		self.SortedPrevJobs.append(currentJob)			# append current job (not a copy)
 		self.SortedPrevJobs.sort(key=lambda JobClass: JobClass.estimatedProcTime)
 		
 		counter = 1
 		for job in self.SortedPrevJobs:
-			job.priority = counter
+			if job.name == currentJob.name:
+				currentJob.priority = counter
 			counter += 1
 	
-		# Update priority of jobs in Queue
-		for i in self.SortedPrevJobs:
-			for j in ServerClass.Queue:
-				if i.name == j.name:
-					j.priority = i.priority		
+		# Update priority of jobs in Queue ##DO NOT WANT THIS
+		#for i in self.SortedPrevJobs:
+		#	for j in ServerClass.Queue:
+		#		if i.name == j.name:
+		#			j.priority = i.priority		
 
 		# Remove any jobs that are in the sorted previous jobs list that have already been completed as they should
 		# not be re-added to the queue when we do the union
-		i = 0
-		while i < len(self.SortedPrevJobs):
-			j = 0
-			while j < len(ServerClass.JobOrderOut):
-				try: 
-					job = self.SortedPrevJobs[i]
-					jobName = ServerClass.JobOrderOut[j]
-				except IndexError: #Only happens if removed last item in list
-					break
+		#i = 0
+		#while i < len(self.SortedPrevJobs):
+		#	j = 0
+		#	while j < len(ServerClass.JobOrderOut):
+		#		try: 
+		#			job = self.SortedPrevJobs[i]
+		#			jobName = ServerClass.JobOrderOut[j]
+		#		except IndexError: #Only happens if removed last item in list
+		#			break
 			
 				# If job is removed, do not increment SortedPrevJobs, as each job will shift down one index
-				if job.name == jobName:
-					self.SortedPrevJobs.remove(job)
-					continue # restart j while loop without incrementing i
-				else:
-					j += 1
-			i += 1
+		#		if job.name == jobName:
+		#			self.SortedPrevJobs.remove(job)
+		#			continue # restart j while loop without incrementing i
+		#		else:
+		#			j += 1
+		#	i += 1
 				
 				
 		# Union the two lists together
-		ServerClass.Queue = list(set(self.SortedPrevJobs) | set(ServerClass.Queue))
+		#ServerClass.Queue = list(set(self.SortedPrevJobs) | set(ServerClass.Queue))
+		ServerClass.Queue.append(currentJob)
 
-		# Sort Queue by priority
-		ServerClass.Queue.sort(key=lambda JobClass: JobClass.priority)
+		# Sort Queue first by priority, then name
+		ServerClass.Queue.sort(key=lambda JobClass: (JobClass.priority, JobClass.name))
+		for item in ServerClass.Queue:
+			print '%s, %s'%(item.name, item.priority)
+		print '\n'
 			
 		# insert job into queue
 		return ServerClass.Queue
@@ -467,7 +472,7 @@ class ArrivalClass(object):
 			J.setJobAttributes(procRate, procDist, percError)
 			J.name = "Job%02d"%self.ctr
 
-			GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %s"%(self.env.now, J.name, J.estimatedProcTime))
+			
 
 			# Save job to arrivals file
 			self.saveArrivals(J)
@@ -478,6 +483,8 @@ class ArrivalClass(object):
 
 			# sort jobs into classes, add job to queue
 			self.sortQueue(numClasses, J)
+
+			GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %.4f, class %s"%(self.env.now, J.name, J.estimatedProcTime, J.priority))
 
 			S = ServerClass(self.env, self.master)
 			serverProcess = env.process(S.executeJobs(server))
@@ -567,13 +574,13 @@ class ServerClass(object):
 			# job is removed from queue, ready to start executing
 			Job = ServerClass.Queue.pop(0)
 			ServerClass.JobOrderOut.append(Job.name)
-			GUI.writeToConsole(self.master, "%.6f | %s server request granted, begin executing"%(self.env.now, Job.name))
+			GUI.writeToConsole(self.master, "%.6f | %s server request granted, begin executing, class %s"%(self.env.now, Job.name, Job.priority))
 
 			# process job according to REAL processing time
 			yield self.env.timeout(Job.realProcTime)
 
 			# job completed and released
-			GUI.writeToConsole(self.master, "%.6f | %s COMPLETED"%(self.env.now, Job.name))
+			GUI.writeToConsole(self.master, "%.6f | %s COMPLETED, class %s"%(self.env.now, Job.name, Job.priority))
 
 
 		ServerClass.NumJobsInSys -= 1
