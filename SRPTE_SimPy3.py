@@ -193,9 +193,10 @@ class Input(LabelFrame):
         self.simLengthInput = DoubleVar()
 	self.errorMessage = StringVar()
 
-	self.arrivalRateInput.set(2.0)		##################################CHANGE LATER
+	self.arrivalRateInput.set(4.0)		##################################CHANGE LATER
 	self.processingRateInput.set(0.5)	##################################CHANGE LATER
-	self.simLengthInput.set(111.0)		##################################CHANGE LATER
+	self.percentErrorInput.set(15)		##################################CHANGE LATER
+	self.simLengthInput.set(100.0)		##################################CHANGE LATER
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -457,8 +458,7 @@ class ArrivalClass(object):
 
             GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %s"%(self.env.now, J.name, J.estimatedRemainingProcTime))
 
-
-            # INTERRUPT JOB IN SERVICE (if there is one), AND RE-SORT QUEUE
+            # Interrupt job in service (if there is one), and re-sort queue
             if resourceBusy:
                 serverProcess.interrupt(J)
 	    else:
@@ -572,20 +572,25 @@ class ServerClass(object):
 
         # First job in queue requests service
         Job = self.getFirstJobQueued()
+	print "%s first job queued!"%Job.name
         
         # This "with" statement automatically releases the resource when it has completed its job
         with server.request(priority=Job.priority, preempt=True) as req:
             GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated proc time = %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
             try:
                 yield req 	# request server
-            except simpy.Interrupt:
-                pass
-                
-            # Job is ready to start executing
-            resourceBusy = True
-            serviceStartTime = self.env.now
-            GUI.writeToConsole(self.master, "%.6f | %s server request granted"%(self.env.now, Job.name))
 
+                # Job is ready to start executing
+                resourceBusy = True
+                serviceStartTime = self.env.now
+
+                GUI.writeToConsole(self.master, "%.6f | %s server request granted, resourceBusy = %s"%(self.env.now, Job.name, resourceBusy))
+		self.removeFirstJobQueued()
+		print "%s removed from queue\n\n\n"%Job.name 
+
+            except simpy.Interrupt:
+		pass
+                
             try:
                 yield self.env.timeout(Job.realRemainingProcTime)  # process job according to REAL processing time
 
@@ -593,7 +598,6 @@ class ServerClass(object):
                 resourceBusy = False
                 GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(self.env.now, Job.name))
                 ServerClass.JobOrderOut.append(Job.name)
-                self.removeFirstJobQueued() 
 
                 ServerClass.NumJobsInSys -= 1
 
@@ -609,19 +613,20 @@ class ServerClass(object):
                 Job.estimatedRemainingProcTime -= serviceTime
                 Job.priority = Job.estimatedRemainingProcTime
 
-		# Update job data in file
-		# 1. Remove job from file
-		self.removeFirstJobQueued() 
-		# 2. Add updated job to file
+                GUI.writeToConsole(self.master, "%.6f | %s INTERRUPTED, rem proc time %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
+
+		# Add updated job back to file
 		self.arrivalInstance.addJobToFile(Job)
+		print "%s added to queue\n\n\n"%Job.name 
 
                 # Sort queue
-                self.arrivalInstance.sortQueueFile()
-
-                GUI.writeToConsole(self.master, "%.6f | %s INTERRUPTED, rem proc time %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
+                self.arrivalInstance.sortQueueFile()               
 
                 # Resource releases current job in order to allow premption
                 server.release(request=req)
+
+
+		#NOTE:: ERROR IF JOB IS INTERRUPTED AND SUPPOSED TO CONTINUE!!!
 
 #----------------------------------------------------------------------#
 def main():
