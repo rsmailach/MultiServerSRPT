@@ -154,6 +154,7 @@ class GUI(Tk):
     def submit(self, event):
         self.updateStatusBar("Simulating...")
         self.clearQueueFile()
+        self.clearSavedArrivals()
         inputInstance = Input(self)     
 
         self.printParams(inputInstance.valuesList[0], inputInstance.valuesList[1],\
