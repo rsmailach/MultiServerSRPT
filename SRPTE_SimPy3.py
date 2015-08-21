@@ -29,8 +29,7 @@ PercError = []
 #----------------------------------------------------------------------#
 # Class: GUI
 #
-# This class is used as a graphical user interface for a larger
-# application.
+# This class is used as a graphical user interface for the application.
 #
 #----------------------------------------------------------------------#
 class GUI(Tk):
