@@ -26,8 +26,6 @@ TimeSys = []
 ProcTime = []
 PercError = []
 
-resourceBusy = False
-
 #----------------------------------------------------------------------#
 # Class: GUI
 #
@@ -72,7 +70,7 @@ class GUI(Tk):
         consoleFrame = Frame(self.frameOut)
         consoleFrame.pack(side=TOP, padx=5, pady=5)
         self.console = Text(consoleFrame, wrap = WORD)
-        self.console.config(state=DISABLED) 	# start with console as disabled (non-editable)
+        self.console.config(state=DISABLED)     # start with console as disabled (non-editable)
         scrollbar = Scrollbar(consoleFrame)
         scrollbar.config(command = self.console.yview)
         self.console.config(yscrollcommand=scrollbar.set)
@@ -80,10 +78,10 @@ class GUI(Tk):
         scrollbar.grid(column=1, row=0, sticky='NS')
 
     def writeToConsole(self, text = ' '):
-        self.console.config(state=NORMAL) 	# make console editable
+        self.console.config(state=NORMAL)       # make console editable
         self.console.insert(END, '%s\n'%text)
         self.update()
-        self.console.config(state=DISABLED) 	# disable (non-editable) console
+        self.console.config(state=DISABLED)     # disable (non-editable) console
 
     def saveData(self, event):
         # Get filename
@@ -101,7 +99,7 @@ class GUI(Tk):
 
     # Empty queue file at the begining of each simulation
     def clearQueueFile(self):
-        open('SRPTE_Queue.txt', 'w').close()
+        open('Queue.txt', 'w').close()
 
     # Empty arrivals file at the begining of each simulation
     def clearSavedArrivals(self):
@@ -110,9 +108,9 @@ class GUI(Tk):
             myFile.close()
 
     def clearConsole(self, event):
-        self.console.config(state=NORMAL) 	# make console editable
+        self.console.config(state=NORMAL)       # make console editable
         self.console.delete('1.0', END)
-        self.console.config(state=DISABLED) 	# disable (non-editable) console
+        self.console.config(state=DISABLED)     # disable (non-editable) console
 
     def updateStatusBar(self, text=' '):
         self.statusText.set(text)
@@ -129,33 +127,34 @@ class GUI(Tk):
         self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
 
     def calcVariance(self, List, avg):
-	var = 0
-	for i in List:
-	    var += (avg - i)**2
-	return var/len(List)
+        var = 0
+        for i in List:
+            var += (avg - i)**2
+        return var/len(List)
 
     def displayAverageData(self):
-	AvgNumJobs = int(float(sum(NumJobs))/len(NumJobs))
-	AvgTimeSys = float(sum(TimeSys))/len(TimeSys)
-	AvgProcTime = float(sum(ProcTime))/len(ProcTime)
-	VarProcTime = self.calcVariance(ProcTime, AvgProcTime)
-	AvgPercError = float(sum(PercError))/len(PercError)
+        AvgNumJobs = int(float(sum(NumJobs))/len(NumJobs))
+        AvgTimeSys = float(sum(TimeSys))/len(TimeSys)
+        AvgProcTime = float(sum(ProcTime))/len(ProcTime)
+        VarProcTime = self.calcVariance(ProcTime, AvgProcTime)
+        AvgPercError = float(sum(PercError))/len(PercError)
 
-        self.writeToConsole('Average number of jobs in the system %s' %AvgNumJobs)
+        self.writeToConsole('\n\n Average number of jobs in the system %s' %AvgNumJobs)
         self.writeToConsole('Average time in system, from start to completion is %s' %AvgTimeSys)
         self.writeToConsole('Average processing time, based on generated service times is %s' %AvgProcTime)
         self.writeToConsole('Variance of processing time %s' %VarProcTime)
-	self.writeToConsole('Average percent error %.4f\n' %AvgPercError)
+        self.writeToConsole('Average percent error %.4f\n' %AvgPercError)
         #self.writeToConsole('Request order: %s' % ArrivalClass.JobOrderIn)
         self.writeToConsole('Service order: %s\n\n' % ServerClass.JobOrderOut)
         self.writeToConsole("--------------------------------------------------------------------------------")
-	self.writeToConsole('NOTE: THERE ARE STILL ERRORS WHEN RUNING MULTIPLE SIMULATIONS WITHOUT FIRST QUITTING THE APPLICATION.')
+        self.writeToConsole('NOTE: THERE ARE STILL ERRORS WHEN RUNING MULTIPLE SIMULATIONS WITHOUT FIRST QUITTING THE APPLICATION.')
         self.writeToConsole("--------------------------------------------------------------------------------\n\n\n")
 
                 
     def submit(self, event):
         self.updateStatusBar("Simulating...")
         self.clearQueueFile()
+        self.clearSavedArrivals()
         inputInstance = Input(self)     
 
         self.printParams(inputInstance.valuesList[0], inputInstance.valuesList[1],\
@@ -191,12 +190,12 @@ class Input(LabelFrame):
         self.processingRateInput = DoubleVar()
         self.percentErrorInput = DoubleVar()
         self.simLengthInput = DoubleVar()
-	self.errorMessage = StringVar()
+        self.errorMessage = StringVar()
 
-	self.arrivalRateInput.set(4.0)		##################################CHANGE LATER
-	self.processingRateInput.set(0.5)	##################################CHANGE LATER
-	self.percentErrorInput.set(15)		##################################CHANGE LATER
-	self.simLengthInput.set(100.0)		##################################CHANGE LATER
+        self.arrivalRateInput.set(2.0)          ##################################CHANGE LATER
+        self.processingRateInput.set(0.5)       ##################################CHANGE LATER
+        self.percentErrorInput.set(20)          ##################################CHANGE LATER
+        self.simLengthInput.set(50.0)           ##################################CHANGE LATER
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -208,8 +207,8 @@ class Input(LabelFrame):
         for elem in labels:
             Label(self, text=elem).grid(row=r, column=c)
             r=r+1
-	
-	Label(self, textvariable=self.errorMessage, fg="red", font=14).grid(row=5, columnspan=4)
+        
+        Label(self, textvariable=self.errorMessage, fg="red", font=14).grid(row=5, columnspan=4)
         Label(self, text=u"\u00B1").grid(row=2, column=1)
 
         # Entry Boxes
@@ -237,45 +236,45 @@ class Input(LabelFrame):
         self.simulateButton.grid(row = 6, columnspan = 4)
 
     def onButtonClick(self):
-	if (self.getNumericValues() == 0) and (self.getDropDownValues() == 0):
-		# Send to submit button in main	
-		self.simulateButton.event_generate("<<input_simulate>>")
+        if (self.getNumericValues() == 0) and (self.getDropDownValues() == 0):
+                # Send to submit button in main 
+                self.simulateButton.event_generate("<<input_simulate>>")
 
 
     def getNumericValues(self):
-	try:
-        	arrivalRate = self.arrivalRateInput.get()
-	        processingRate = self.processingRateInput.get()
-        	percentError = self.percentErrorInput.get()
-        	maxSimLength = self.simLengthInput.get()
-	except ValueError:
-		self.errorMessage.set("One of your inputs is an incorrect type, try again.")
-		return 1
+        try:
+                arrivalRate = self.arrivalRateInput.get()
+                processingRate = self.processingRateInput.get()
+                percentError = self.percentErrorInput.get()
+                maxSimLength = self.simLengthInput.get()
+        except ValueError:
+                self.errorMessage.set("One of your inputs is an incorrect type, try again.")
+                return 1
 
         if arrivalRate <= 0.0:
-		self.errorMessage.set("Arrival rate must be non-zero value!")
-		return 1
+                self.errorMessage.set("Arrival rate must be non-zero value!")
+                return 1
         if processingRate <= 0.0:
-		self.errorMessage.set("Processing rate must be non-zero value!")
-		return 1
+                self.errorMessage.set("Processing rate must be non-zero value!")
+                return 1
         if maxSimLength <= 0.0:
-		self.errorMessage.set("Simulation length must be non-zero value!")
-		return 1
-	else:
-		self.errorMessage.set("")
-        	Input.valuesList = [arrivalRate, processingRate, percentError, maxSimLength]
-	        return 0
+                self.errorMessage.set("Simulation length must be non-zero value!")
+                return 1
+        else:
+                self.errorMessage.set("")
+                Input.valuesList = [arrivalRate, processingRate, percentError, maxSimLength]
+                return 0
 
     def getDropDownValues(self):
         #if self.comboBox_1.get() == 'Select Distribution': print "Box 1 has to have a selection"
-	comboBox2Value = self.comboBox_2.get()
+        comboBox2Value = self.comboBox_2.get()
         if comboBox2Value == 'Select Distribution':
-		self.errorMessage.set("You must select a distribution for the processing rate")
-		return 1
-	else:
-		self.errorMessage.set("")
-       		Input.distList = ["", comboBox2Value, "", "", ""]
-        	return 0
+                self.errorMessage.set("You must select a distribution for the processing rate")
+                return 1
+        else:
+                self.errorMessage.set("")
+                Input.distList = ["", comboBox2Value, "", "", ""]
+                return 0
 
 #----------------------------------------------------------------------#
 # Class: Output
@@ -294,11 +293,11 @@ class Output(LabelFrame):
         buttonFrame.pack(side=BOTTOM, padx=5, pady=5)
 
         # Clear Button
-        self.clearButton = Button(buttonFrame, text = "CLEAR ALL DATA", command = self.onClearButtonClick)
+        self.clearButton = Button(buttonFrame, text = "CLEAR DATA", command = self.onClearButtonClick)
         self.clearButton.grid(row = 2, column = 0)
         
         # Save Button
-        self.saveButton = Button(buttonFrame, text = "SAVE ALL DATA", command = self.onSaveButtonClick)
+        self.saveButton = Button(buttonFrame, text = "SAVE DATA", command = self.onSaveButtonClick)
         self.saveButton.grid(row=2, column=1)
 
     def onClearButtonClick(self):
@@ -381,96 +380,6 @@ class CustomDist(object):
         
 
 #----------------------------------------------------------------------#
-# Class: ArrivalClass
-#
-# This class is used to generate Jobs at random.
-#
-#----------------------------------------------------------------------#
-class ArrivalClass(object):
-    JobOrderIn = []
-
-    def __init__(self, env, master):
-        self.env = env
-        self.master = master
-
-	NumJobs = []
-	TimeSys = []
-	ProcTime = []
-	PercError = [] 
-    
-        self.ctr = 0
-
-    # Dictionary of arrival distributions
-    def setArrivalDist(self, arrRate, arrDist):
-        ArrivalDistributions = {
-            'Poisson': random.expovariate(1.0/arrRate),
-            'Exponential': random.expovariate(arrRate)
-            #'Normal': Rnd.normalvariate(self.inputInstance.valuesList[0])
-            #'Custom':
-        }
-        return ArrivalDistributions[arrDist]
-
-    def addJobToFile(self, job):
-        text = str(job.name) + "," + str(job.arrivalTime) + "," + str(job.realRemainingProcTime) + "," + \
-            str(job.estimatedRemainingProcTime) + "," + str(job.procTime) + "," + str(job.percentError) + "\n"
-        
-        with open("SRPTE_Queue.txt", "a") as myFile:
-            myFile.write(text)
-            myFile.close()
-
-    def saveArrivals(self, job):
-        text = str(job.name) + "," + str(job.arrivalTime) + "," + str(job.realRemainingProcTime) + "," + \
-            str(job.estimatedRemainingProcTime) + "," + str(job.procTime) + "," + str(job.percentError) + "\n"
-        
-        with open("Arrivals.txt", "a") as myFile:
-            myFile.write(text)
-            myFile.close()
-
-    def sortQueueFile(self):
-        with open("SRPTE_Queue.txt", "r") as myFile:
-            csv1 = csv.reader(myFile, delimiter=',')
-            sort = sorted(csv1, key=operator.itemgetter(3)) #sort by 4th column (Estimated remaining proc time)
-            myFile.close()
-
-        with open("SRPTE_Queue.txt", "w") as myFile:
-            for eachline in sort:
-                line = ','.join(eachline)   # convert each row to correct format
-                myFile.write(line + '\n')
-                print line
-            myFile.close()
-            print "\n"
-
-    def generateArrivals(self, env, arrRate, arrDist, procRate, procDist, percError, server):
-        while 1:
-            # Wait for arrival of next job
-            yield env.timeout(self.setArrivalDist(arrRate, arrDist))
-
-            J = JobClass(self.env, self.master)
-            J.setJobAttributes(procRate, procDist, percError)
-            J.name = "Job%02d"%self.ctr
-
-            # Save job to arrivals file
-            self.saveArrivals(J)
-            
-            # Add job to queue
-            self.addJobToFile(J)
-            ArrivalClass.JobOrderIn.append(J.name)
-
-            GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %s"%(self.env.now, J.name, J.estimatedRemainingProcTime))
-
-            # Interrupt job in service (if there is one), and re-sort queue
-            if resourceBusy:
-                serverProcess.interrupt(J)
-	    else:
-		self.sortQueueFile()
-
-            S = ServerClass(self.env, self.master)
-            serverProcess = env.process(S.executeJobs(server))              
-
-            self.ctr += 1
-
-
-#----------------------------------------------------------------------#
 # Class: JobClass
 #
 # This class is used to define jobs.
@@ -485,7 +394,7 @@ class JobClass(object):
         self.priority = 0
         self.realRemainingProcTime = 0
         self.estimatedRemainingProcTime = 0
-	self.percentError = 0
+        self.percentError = 0
 
     # Dictionary of service distributions
     def setServiceDist(self, procRate, procDist):
@@ -525,6 +434,101 @@ class JobClass(object):
 
 
 #----------------------------------------------------------------------#
+# Class: ArrivalClass
+#
+# This class is used to generate Jobs at random.
+#
+#----------------------------------------------------------------------#
+class ArrivalClass(object):
+    JobOrderIn = []
+
+    def __init__(self, env, master):
+        self.env = env
+        self.master = master
+
+        NumJobs = []
+        TimeSys = []
+        ProcTime = []
+        PercError = [] 
+    
+        self.ctr = 0
+
+    # Dictionary of arrival distributions
+    def setArrivalDist(self, arrRate, arrDist):
+        ArrivalDistributions = {
+            'Poisson': random.expovariate(1.0/arrRate),
+            'Exponential': random.expovariate(arrRate)
+            #'Normal': Rnd.normalvariate(self.inputInstance.valuesList[0])
+            #'Custom':
+        }
+        return ArrivalDistributions[arrDist]
+
+    def addJobToFile(self, job):
+        text = str(job.name) + "," + str(job.arrivalTime) + "," + str(job.realRemainingProcTime) + "," + \
+            str(job.estimatedRemainingProcTime) + "," + str(job.procTime) + "," + str(job.percentError) + "\n"
+        
+        with open("Queue.txt", "a") as myFile:
+            myFile.write(text)
+            myFile.close()
+
+    def saveArrivals(self, job):
+        text = str(job.name) + "," + str(job.arrivalTime) + "," + str(job.realRemainingProcTime) + "," + \
+            str(job.estimatedRemainingProcTime) + "," + str(job.procTime) + "," + str(job.percentError) + "\n"
+        
+        with open("Arrivals.txt", "a") as myFile:
+            myFile.write(text)
+            myFile.close()
+
+    def sortQueueFile(self):
+        with open("Queue.txt", "r") as myFile:
+            csv1 = csv.reader(myFile, delimiter=',')
+            sort = sorted(csv1, key=operator.itemgetter(3)) #sort by 4th column (Estimated remaining proc time)
+            myFile.close()
+
+        with open("Queue.txt", "w") as myFile:
+            for eachline in sort:
+                line = ','.join(eachline)   # convert each row to correct format
+                myFile.write(line + '\n')
+                #print line
+            myFile.close()
+            #print "\n"
+
+    def generateArrivals(self, env, arrRate, arrDist, procRate, procDist, percError, server):
+        # Create the server
+        S = ServerClass(self.env, self.master)
+        
+        while 1:	
+			# Wait for arrival of next job
+			yield env.timeout(self.setArrivalDist(arrRate, arrDist))
+            
+			J = JobClass(self.env, self.master)
+			J.setJobAttributes(procRate, procDist, percError)
+			J.name = "Job%02d"%self.ctr
+
+            # Save job to arrivals file
+			self.saveArrivals(J)
+            
+            # Add job to queue
+			self.addJobToFile(J)
+			ArrivalClass.JobOrderIn.append(J.name)
+
+			GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %s"%(self.env.now, J.name, J.estimatedRemainingProcTime))
+
+            # Interrupt job in service (if there is one), and re-sort queue
+			if ServerClass.resourceBusy:
+				print "%s | Arrival class (going to interrupt) current job %s"%(self.env.now, ServerClass.currentJob.name)
+				#try:
+				serverProcess.interrupt(ServerClass.currentJob)
+				#except RuntimeError:
+				#	GUI.writeToConsole(self.master, "%s can not be interrupted"%ServerClass.currentJob.name)
+			else:
+				self.sortQueueFile()
+
+			ServerClass.NumJobsInSys += 1
+			serverProcess = env.process(S.executeJobs(server))
+			self.ctr += 1
+
+#----------------------------------------------------------------------#
 # Class: ServerClass
 #
 # This class is used to actually model the job processing.
@@ -534,6 +538,7 @@ class ServerClass(object):
     NumJobsInSys = 0
     CompletedJobs = 0
     JobOrderOut = []
+    resourceBusy = False
 
     def __init__(self, env, master):
         self.env = env
@@ -541,7 +546,7 @@ class ServerClass(object):
         self.arrivalInstance = ArrivalClass(env, master)
 
     def getFirstJobQueued(self):
-        with open('SRPTE_Queue.txt', 'r') as myFile:
+        with open('Queue.txt', 'r') as myFile:
             reader = csv.reader(myFile)
             firstRow = next(reader)
 
@@ -553,58 +558,61 @@ class ServerClass(object):
         job.arrivalTime = float(firstRow[1])
         job.realRemainingProcTime = float(firstRow[2])
         job.estimatedRemainingProcTime = float(firstRow[3])
-	job.procTime = float(firstRow[4])
-	job.percentError = float(firstRow[5])
+        job.procTime = float(firstRow[4])
+        job.percentError = float(firstRow[5])
         job.priority = job.estimatedRemainingProcTime      # Priority is negative of estimated remaining processing time, \
-                                    			   # less processing time remaining equals higher priority
+                                                           # less processing time remaining equals higher priority
         return job
 
     def removeFirstJobQueued(self):
-        with open('SRPTE_Queue.txt', 'r') as fin:
+        with open('Queue.txt', 'r') as fin:
             data = fin.read().splitlines(True)
             fin.close()
-        with open('SRPTE_Queue.txt', 'w') as fout:
+        with open('Queue.txt', 'w') as fout:
             fout.writelines(data[1:])
             fout.close()
     
     def executeJobs(self, server):
-        ServerClass.NumJobsInSys += 1
-
         # First job in queue requests service
         Job = self.getFirstJobQueued()
-	print "%s first job queued!"%Job.name
         
         # This "with" statement automatically releases the resource when it has completed its job
         with server.request(priority=Job.priority, preempt=True) as req:
             GUI.writeToConsole(self.master, "%.6f | %s requests service, estimated proc time = %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
             try:
-                yield req 	# request server
+                yield req       # request server
 
                 # Job is ready to start executing
-                resourceBusy = True
+                ServerClass.currentJob = Job
+                #print "%s | Server class current job %s"%(self.env.now, ServerClass.currentJob.name)
+                ServerClass.resourceBusy = True
                 serviceStartTime = self.env.now
 
-                GUI.writeToConsole(self.master, "%.6f | %s server request granted, resourceBusy = %s"%(self.env.now, Job.name, resourceBusy))
-		self.removeFirstJobQueued()
-		print "%s removed from queue\n\n\n"%Job.name 
+                GUI.writeToConsole(self.master, "%.6f | %s server request granted"%(self.env.now, Job.name))
+                self.removeFirstJobQueued()
 
             except simpy.Interrupt:
-		pass
+                pass
+
                 
             try:
                 yield self.env.timeout(Job.realRemainingProcTime)  # process job according to REAL processing time
 
                 # Job completed and released
-                resourceBusy = False
+                ServerClass.resourceBusy = False
                 GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(self.env.now, Job.name))
                 ServerClass.JobOrderOut.append(Job.name)
 
                 ServerClass.NumJobsInSys -= 1
 
-		NumJobs.append(ServerClass.NumJobsInSys)
-		TimeSys.append(self.env.now - Job.arrivalTime)
-		ProcTime.append(Job.procTime)
-		PercError.append(abs(Job.percentError)) # only take absolute value of error
+                NumJobs.append(ServerClass.NumJobsInSys)
+                TimeSys.append(self.env.now - Job.arrivalTime)
+                ProcTime.append(Job.procTime)
+                PercError.append(abs(Job.percentError)) # only take absolute value of error
+
+                #if ServerClass.NumJobsInSys > 0:
+                    # Start processing next job in queue
+                #    self.env.process(self.executeJobs(server))    
         
             # Interrupted, update values
             except simpy.Interrupt as interrupt:
@@ -615,9 +623,9 @@ class ServerClass(object):
 
                 GUI.writeToConsole(self.master, "%.6f | %s INTERRUPTED, rem proc time %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
 
-		# Add updated job back to file
-		self.arrivalInstance.addJobToFile(Job)
-		print "%s added to queue\n\n\n"%Job.name 
+                # Add updated job back to file
+                self.arrivalInstance.addJobToFile(Job)
+                #print "%s added to queue\n\n\n"%Job.name 
 
                 # Sort queue
                 self.arrivalInstance.sortQueueFile()               
@@ -625,8 +633,6 @@ class ServerClass(object):
                 # Resource releases current job in order to allow premption
                 server.release(request=req)
 
-
-		#NOTE:: ERROR IF JOB IS INTERRUPTED AND SUPPOSED TO CONTINUE!!!
 
 #----------------------------------------------------------------------#
 def main():
