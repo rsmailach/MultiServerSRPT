@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------#
-# main.py
+# ApproxSRPTE_SimPy3.py
 #
 # This application simulates a single server with Poisson arrivals
 # and processing times of a general distribution. There are errors in
