@@ -166,7 +166,7 @@ class GUI(Tk):
 				inputInstance.valuesList[1], inputInstance.distList[1],\
 				inputInstance.valuesList[2], inputInstance.valuesList[3])
 
-		self.displayAverageData()
+		#self.displayAverageData()
 		self.updateStatusBar("Simulation complete.")
 
 
@@ -373,21 +373,84 @@ class CustomDist(object):
 				self.stringList[i+1] = ""
 		return "".join(self.stringList)
 		
+#----------------------------------------------------------------------#
+# Class: Node
+#
+# This class is used to define the linked list nodes.
+#
+#----------------------------------------------------------------------#
+class Node():
+	def __init__(self, job, nextNode = None):
+		self.job = job
+		self.nextNode = nextNode
+
+#----------------------------------------------------------------------#
+# Class: LinkedList
+#
+# This class is used to make the linked list data structure used to
+# store jobs.
+#
+#----------------------------------------------------------------------#
+class LinkedList(object):
+	Size = 0
+
+	def __init__(self, head = None):
+		self.head = head
+
+	# ................................... COPIED DIRECTLY ...................................
+	# http://stackoverflow.com/questions/28464077/insert-in-ordered-linked-list-python
+	def printQueue(self):
+		data_list = []    
+		current = self.head
+		while current is not None:
+			data_list.append(str(current.data))
+			current = current.next
+		return '->'.join(data_list)
+    # ................................... COPIED DIRECTLY ...................................
+
+    # Insert job into queue (sorted by ERPT)
+	def insert(self, job):
+		current = self.head		# node iterator, starts at head
+		previous = None
+		if (current == None):	# if queue is empty, set current job as head
+			self.head = Node(job, None)
+		else:
+			while (current != None) and (job.ERPT > current.job.ERPT):
+				previous = current 				# prev = node[i]
+				current = current.nextNode 		# current = node[i+1]
+			
+
+
+			# Insert new node after previous before current
+			if(previous == None):
+				self.head = Node(job, current)
+			else:
+				previous.nextNode = Node(job, current)
+
+		LinkedList.Size += 1
+
+	# Remove first item in queue
+	def remove(self):
+		if (LinkedList.Size > 0):
+			self.head = self.head.nextNode		# move head forward one node
+			LinkedList.Size -= 1
+		else:
+			GUI.writeToConsole(self.master, "ERROR: The linked list is already empty!")
+
 
 #----------------------------------------------------------------------#
 # Class: JobClass
 #
 # This class is used to define jobs.
 #
-# Attributes: arrival time, processing time, priority, remaining
-# processing time, estimated remaining processing time, percent error
+# Attributes: arrival time, processing time, remaining processing 
+# time, estimated remaining processing time, percent error
 #----------------------------------------------------------------------#
 class JobClass(object):
 	def __init__(self, master):
 		self.master = master
 		self.arrivalTime = 0
 		self.procTime = 0
-		self.priority = 0
 		self.RPT = 0		# Real Remaining Processing Time
 		self.ERPT = 0		# Estimated Remaining Processing Time
 		self.percentError = 0
@@ -441,14 +504,16 @@ class JobClass(object):
 #
 #----------------------------------------------------------------------#
 class MachineClass(object):
-	Queue = []
+	Queue = LinkedList()
 	JobOrderOut = []
 	CurrentTime = 0.0
+	ServiceStartTime = 0
+	NumJobsInSys = 0
 
 	def __init__(self, master):
 		self.master = master
 		self.timeUntilArrival = 0.0
-		self.timeToArrival = 0.0
+		self.timeOfArrival = 0.0
 		self.serverBusy = False
 
 		NumJobs = []
@@ -469,30 +534,26 @@ class MachineClass(object):
 		return ArrivalDistributions[arrDist]
 	
 	def enqueueJob(self, job):
-		pass
+		MachineClass.Queue.insert(job)
 
 	def dequeueJob(self):
 		pass
 
-	# sort queue
-	def sortQueue(self):
-		pass
-
 	def getProcessingJob(self):
-		job = MachineClass.Queue[0]
-		return job
+		#if(MachineClass.Queue.Size > 0):
+		currentJob = MachineClass.Queue.head.job
+		return currentJob
+		
+		#else:
+		#	GUI.writeToConsole(self.master, "nothing in queue")
+
 
 	#update data
-	def updateJobs(self):
-		pass
-
-
-
-	# process first job in queue
-	def processJob(self):
-		self.serverBusy = True
-
-		pass
+	def updateJob(self):
+		currentJob = self.getProcessingJob()
+		serviceTime = MachineClass.CurrentTime - MachineClass.ServiceStartTime
+		currentJob.RPT -= serviceTime
+		currentJob.ERPT -= serviceTime
 
 	# Job arriving
 	def arrivalEvent(self, arrRate, arrDist, procRate, procDist, percError):
@@ -501,26 +562,50 @@ class MachineClass(object):
 		J.name = "Job%02d"%self.ctr
 		self.ctr += 1
 
-		self.enqueueJob(J)	#add job to queue
-		self.updateJobs()	#update data in queue
-		self.sortQueue()	# sort queue
-		self.processJob()	# process first job in queue & averages
+		MachineClass.NumJobsInSys += 1
 
-		timeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
-		timeOfArrival = MachineClass.CurrentTime + timeUntilArrival
+		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
+		if(MachineClass.Queue.Size > 0):
+			self.updateJob()	# update data in queue
+		self.enqueueJob(J)	# add job to queue
+		self.processJob()	# process first job in queue
+
+		self.timeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
+		self.timeOfArrival = MachineClass.CurrentTime + self.timeUntilArrival
+
+	# Processing first job in queue
+	def processJob(self):
+		MachineClass.ServiceStartTime = MachineClass.CurrentTime
+		currentJob = self.getProcessingJob()
+		GUI.writeToConsole(self.master, "%.6f | %s processing, ERPT = %.5f"%(MachineClass.CurrentTime, currentJob.name, currentJob.ERPT))
+		self.serverBusy = True
 
 	# Job completed
 	def completionEvent(self):
-		self.dequeueJob() # remove job from queue
+		currentJob = self.getProcessingJob()
+		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, currentJob.name))
+
 		self.serverBusy = False
-		self.updateJobs()	#update data in queue & averages
+
+		MachineClass.JobOrderOut.append(currentJob.name)
+		MachineClass.NumJobsInSys -= 1
+		NumJobs.append(MachineClass.NumJobsInSys)
+		TimeSys.append(MachineClass.CurrentTime - currentJob.arrivalTime)
+		ProcTime.append(currentJob.procTime)
+		PercError.append(abs(currentJob.percentError))
+
+
+		self.dequeueJob() # remove job from queue
+		
+
 
 	def run(self, arrRate, arrDist, procRate, procDist, percError, simLength):
 		while 1:
 			# If no jobs in system, or time to arrival is less than remaining processing time of job currently processing
-			if (self.serverBusy == False) or ((self.serverBusy == True) and (self.timeToArrival < self.getProcessingJob().RPT)):
+			if (self.serverBusy == False) or ((self.serverBusy == True) and (self.timeUntilArrival < self.getProcessingJob().RPT)):
 				#next event is arrival
 				MachineClass.CurrentTime += self.timeUntilArrival
+
 				# stop server from processing current job
 				self.serverBusy == False
 				self.arrivalEvent(arrRate, arrDist, procRate, procDist, percError)
