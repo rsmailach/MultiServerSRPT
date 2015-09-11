@@ -104,7 +104,7 @@ class GUI(Tk):
     # Empty arrivals file at the begining of each simulation
     def clearSavedArrivals(self):
         with open("Arrivals.txt", "w") as myFile:
-            myFile.write('Job Name, Arrival Time, Real Processing Time, Estimated Processing Time, Amount Already Processed, Percent Error' + '\n')
+            myFile.write('Job Name, Req Processing Time, Est Processing Time' + '\n')
             myFile.close()
 
     def clearConsole(self, event):
@@ -208,8 +208,8 @@ class Input(LabelFrame):
             Label(self, text=elem).grid(row=r, column=c)
             r=r+1
         
-        Label(self, textvariable=self.errorMessage, fg="red", font=14).grid(row=5, columnspan=4)
-        Label(self, text=u"\u00B1").grid(row=2, column=1)
+        Label(self, textvariable=self.errorMessage, fg="red", font=14).grid(row=5, columnspan=4) #error message, invalid input
+        Label(self, text=u"\u00B1").grid(row=2, column=1) # +/-
 
         # Entry Boxes
         self.entry_1 = Entry(self, textvariable = self.arrivalRateInput)
@@ -389,7 +389,7 @@ class JobClass(object):
     def __init__(self, env, master):
         self.env = env
         self.master = master
-        self.arrivalTime = self.env.now
+        self.arrivalTime = 0 #self.env.now
         self.procTime = 0
         self.priority = 0
         self.realRemainingProcTime = 0
@@ -426,11 +426,12 @@ class JobClass(object):
         return self.percentError
 
     # Sets all processing times for job
-    def setJobAttributes(self, procRate, procDist, percError):
+    def setJobAttributes(self, procRate, procDist, percError, jobArrival):
         self.procTime = self.setServiceDist(procRate, procDist)
         self.estimatedProcTime = (1 + (self.generateError(percError)/100.0))*self.procTime
         self.realRemainingProcTime = self.procTime
-        self.estimatedRemainingProcTime = self.estimatedProcTime        
+        self.estimatedRemainingProcTime = self.estimatedProcTime
+        self.arrivalTime = jobArrival
 
 
 #----------------------------------------------------------------------#
@@ -441,6 +442,7 @@ class JobClass(object):
 #----------------------------------------------------------------------#
 class ArrivalClass(object):
     JobOrderIn = []
+    serverProcess = None
 
     def __init__(self, env, master):
         self.env = env
@@ -464,18 +466,17 @@ class ArrivalClass(object):
         return ArrivalDistributions[arrDist]
 
     def addJobToFile(self, job):
-        text = str(job.name) + "," + str(job.arrivalTime) + "," + str(job.realRemainingProcTime) + "," + \
-            str(job.estimatedRemainingProcTime) + "," + str(job.procTime) + "," + str(job.percentError) + "\n"
+        text = str(job.name) + "," + str(job.arrivalTime) + "," + str(job.procTime)  + "," + str(job.realRemainingProcTime) + "," + \
+            str(job.estimatedRemainingProcTime)+ "," + str(job.percentError) + "\n"
         
         with open("Queue.txt", "a") as myFile:
-			myFile.write(text)
-			#print text
-			myFile.close()
-	#print "\n"
+            myFile.write(text)
+            #print text
+            myFile.close()
+    #print "\n"
 
     def saveArrivals(self, job):
-        text = str(job.name) + "," + str(job.arrivalTime) + "," + str(job.realRemainingProcTime) + "," + \
-            str(job.estimatedRemainingProcTime) + "," + str(job.procTime) + "," + str(job.percentError) + "\n"
+        text = str(job.name) + ",  " + str(job.procTime) + ",  " + str(job.estimatedRemainingProcTime) + "\n"
         
         with open("Arrivals.txt", "a") as myFile:
             myFile.write(text)
@@ -489,64 +490,54 @@ class ArrivalClass(object):
         return numberOfRows
 
     def sortQueueFile(self):
-		with open("Queue.txt", "r") as myFile:
-			csv1 = csv.reader(myFile, delimiter=',')
-			sort = sorted(csv1, key=operator.itemgetter(3)) #sort by 4th column (Estimated remaining proc time)
-			myFile.close()
+        with open("Queue.txt", "r") as myFile:
+            csv1 = csv.reader(myFile, delimiter=',')
+            sort = sorted(csv1, key=operator.itemgetter(3)) #sort by 4th column (Estimated remaining proc time)
+            myFile.close()
 
-		with open("Queue.txt", "w") as myFile:
-			for eachline in sort:
-				line = ','.join(eachline)   # convert each row to correct format
-				#print line
-				myFile.write(line + '\n')
-			myFile.close()
-			#print "\n"
+        with open("Queue.txt", "w") as myFile:
+            for eachline in sort:
+                line = ','.join(eachline)   # convert each row to correct format
+                #print line
+                myFile.write(line + '\n')
+            myFile.close()
+            #print "\n"
 
     def generateArrivals(self, env, arrRate, arrDist, procRate, procDist, percError, server):
         # Create the server
         S = ServerClass(self.env, self.master)
 
         while 1:
-			#self.rowCount()
-			#with open("Queue.txt", "r") as myFile:
-			#	for eachline in myFile:
-			#		print eachline
-			#	myFile.close()
+            ArrivalClass.serverProcess = env.process(S.executeJobs(server))
 
-			serverProcess = env.process(S.executeJobs(server))
+            # Schedule arrival of next job
+            timeToArrival = self.setArrivalDist(arrRate, arrDist)
+            jobArrival = self.env.now + timeToArrival
+            yield env.timeout(timeToArrival)
+                        
+            J = JobClass(self.env, self.master)
+            J.setJobAttributes(procRate, procDist, percError, jobArrival)
+            J.name = "Job%02d"%self.ctr
+            self.ctr += 1
 
-			# Schedule arrival of next job
-			yield env.timeout(self.setArrivalDist(arrRate, arrDist))
-			
-            
-			J = JobClass(self.env, self.master)
-			J.setJobAttributes(procRate, procDist, percError)
-			J.name = "Job%02d"%self.ctr
-			self.ctr += 1
+            # Add job to arrivals file and to queue
+            self.saveArrivals(J)
+            self.addJobToFile(J)
+            ArrivalClass.JobOrderIn.append(J.name)
+            ServerClass.NumJobsInSys += 1
 
-            		# Add job to arrivals file and to queue
-			self.saveArrivals(J)
-			self.addJobToFile(J)
-			ArrivalClass.JobOrderIn.append(J.name)
-			ServerClass.NumJobsInSys += 1
+            GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %s"%(self.env.now, J.name, J.estimatedRemainingProcTime))
 
-			GUI.writeToConsole(self.master, "%.6f | %s arrived, estimated proc time = %s"%(self.env.now, J.name, J.estimatedRemainingProcTime))
+            # Interrupt job in service (if there is one), and re-sort queue
+            if (ServerClass.resourceBusy == True) and (ArrivalClass.serverProcess.triggered == False):
+                ArrivalClass.serverProcess.interrupt(ServerClass.currentJob)
+	    elif (ServerClass.resourceBusy == True) and (ArrivalClass.serverProcess.triggered == True): #TEST
+		GUI.writeToConsole(self.master, "________   ERROR: Process %s already triggered, can not be interrupted"%ServerClass.currentJob.name)
+		self.sortQueueFile() 
+            else:
+                self.sortQueueFile()    
 
-            		# Interrupt job in service (if there is one), and re-sort queue
-			if ServerClass.resourceBusy == True:
-				try:
-					#print ServerClass.currentJob.name + ": " + str(ServerClass.currentJob)
-					serverProcess.interrupt(ServerClass.currentJob)
-				except RuntimeError:
-					GUI.writeToConsole(self.master, "________   %s can not be interrupted, est rem proc = %s"%(ServerClass.currentJob.name, ServerClass.currentJob.estimatedRemainingProcTime))
-				#	print "ERROR: " + hex(id(ServerClass.currentJob))
-			else:
-				self.sortQueueFile()	
-	
-			#rows = self.rowCount()
-			#if (ServerClass.resourceBusy == False) and (rows > 0):
-			#serverProcess = env.process(S.executeJobs(server))
-		
+        
 #----------------------------------------------------------------------#
 # Class: ServerClass
 #
@@ -558,27 +549,27 @@ class ServerClass(object):
     CompletedJobs = 0
     JobOrderOut = []
     resourceBusy = False
+    serviceStartTime = 0
 
     def __init__(self, env, master):
         self.env = env
         self.master = master
         self.arrivalInstance = ArrivalClass(env, master)
-	self.jobFinished = env.event()
+        #self.jobFinished = env.event()
 
     def getFirstJobQueued(self):
         with open('Queue.txt', 'r') as myFile:
             reader = csv.reader(myFile)
             firstRow = next(reader)
-
-            myFile.close()
+        myFile.close()
 
         job = JobClass(self.env, self.master)
 
         job.name = str(firstRow[0])
         job.arrivalTime = float(firstRow[1])
-        job.realRemainingProcTime = float(firstRow[2])
-        job.estimatedRemainingProcTime = float(firstRow[3])
-        job.procTime = float(firstRow[4])
+	job.procTime = float(firstRow[2])
+        job.realRemainingProcTime = float(firstRow[3])
+        job.estimatedRemainingProcTime = float(firstRow[4])
         job.percentError = float(firstRow[5])
         job.priority = job.estimatedRemainingProcTime      # Priority is negative of estimated remaining processing time,
                                                            # less processing time remaining equals higher priority
@@ -593,85 +584,93 @@ class ServerClass(object):
             fout.close()
     
     def executeJobs(self, server):
-		#while (ServerClass.resourceBusy == False):
-		# First job in queue requests service
-		Job = self.getFirstJobQueued()
-		
-		# This "with" statement automatically releases the resource when it has completed its job
-		with server.request(priority=Job.priority, preempt=True) as req:
-			GUI.writeToConsole(self.master, "%.6f | %s requesting service, estimated proc time = %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
-			try:
-				yield req       # request server
+        # First job in queue requests service
+        Job = self.getFirstJobQueued()
+        
+	GUI.writeToConsole(self.master, "%.6f | %s requesting service, estimated proc time = %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
+	GUI.writeToConsole(self.master, "%s triggered = %r"%(Job.name, ArrivalClass.serverProcess.triggered))
+        req = server.request(priority=Job.priority, preempt=True)
+        
+        try:
+	    GUI.writeToConsole(self.master, "\n")
+	    with open("Queue.txt", "r") as myFile:
+                for eachline in myFile:
+                    GUI.writeToConsole(self.master, eachline)
+                myFile.close()
+            GUI.writeToConsole(self.master, "\n")
 
-				# Job is ready to start executing
-				ServerClass.currentJob = Job			# same address
-				ServerClass.resourceBusy = True
-				serviceStartTime = self.env.now
+            yield req       # request server
 
-				GUI.writeToConsole(self.master, "%.6f | %s server request granted"%(self.env.now, Job.name))
-				#print "removed job %s"%Job.name
-				self.removeFirstJobQueued()
-				
+            # Job is ready to start executing
+            ServerClass.currentJob = Job        # same address
+            ServerClass.resourceBusy = True
+            ServerClass.serviceStartTime = self.env.now
+
+            self.removeFirstJobQueued()
+
+	    GUI.writeToConsole(self.master, "%.6f | %s server request granted, estimated proc time = %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
+	    GUI.writeToConsole(self.master, "%s triggered = %r"%(Job.name, ArrivalClass.serverProcess.triggered))
+
+        except simpy.Interrupt:
+            pass
+
+        try:
+            yield self.env.timeout(Job.realRemainingProcTime)  # process job according to REAL processing time
+
+	    GUI.writeToConsole(self.master, "%s triggered = %r"%(Job.name, ArrivalClass.serverProcess.triggered))
+
+            # Job completed and released
+	    server.release(request=req)
+            ServerClass.resourceBusy = False
+            GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(self.env.now, Job.name))
+            ServerClass.JobOrderOut.append(Job.name)
+            ServerClass.NumJobsInSys -= 1
+
+            NumJobs.append(ServerClass.NumJobsInSys)
+            TimeSys.append(self.env.now - Job.arrivalTime)
+            ProcTime.append(Job.procTime)
+            PercError.append(abs(Job.percentError)) # only take absolute value of error
+
+	    GUI.writeToConsole(self.master, "\n")
+	    with open("Queue.txt", "r") as myFile:
+                for eachline in myFile:
+                    GUI.writeToConsole(self.master, eachline)
+                myFile.close()
+            GUI.writeToConsole(self.master, "\n")
+    
+            #if ServerClass.NumJobsInSys > 0:
+	    if self.arrivalInstance.rowCount() > 0:
+                # Start processing next job in queue
+                #GUI.writeToConsole(self.master, "%.6f | %s is first in the queue and waiting............."%(self.env.now, self.getFirstJobQueued().name))
+	        GUI.writeToConsole(self.master, "%s triggered = %r"%(Job.name, ArrivalClass.serverProcess.triggered))
+                self.env.process(self.executeJobs(server))
+                    
+        # Interrupted, update values
+        except simpy.Interrupt:
+            serviceTime = self.env.now - ServerClass.serviceStartTime
+            Job.realRemainingProcTime -= serviceTime
+            Job.estimatedRemainingProcTime -= serviceTime
+            Job.priority = Job.estimatedRemainingProcTime
+    
+            GUI.writeToConsole(self.master, "%.6f | %s INTERRUPTED, rem proc time %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
+
+            # Add updated job back to file
+            self.arrivalInstance.addJobToFile(Job)
+
+            # Sort queue
+            self.arrivalInstance.sortQueueFile()  
+
+	    GUI.writeToConsole(self.master, "\n")
+	    with open("Queue.txt", "r") as myFile:
+                for eachline in myFile:
+                    GUI.writeToConsole(self.master, eachline)
+                myFile.close()
+            GUI.writeToConsole(self.master, "\n")             
+
+            # Resource releases current job in order to allow premption
+            server.release(request=req)
 	
-			except simpy.Interrupt:
-				pass
 
-			try:
-				yield self.env.timeout(Job.realRemainingProcTime)  # process job according to REAL processing time
-
-				# Job completed and released
-				ServerClass.resourceBusy = False
-				GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(self.env.now, Job.name))
-				ServerClass.JobOrderOut.append(Job.name)
-				ServerClass.NumJobsInSys -= 1
-
-				NumJobs.append(ServerClass.NumJobsInSys)
-				TimeSys.append(self.env.now - Job.arrivalTime)
-				ProcTime.append(Job.procTime)
-				PercError.append(abs(Job.percentError)) # only take absolute value of error
-	
-				if ServerClass.NumJobsInSys > 0:
-					# Start processing next job in queue
-					GUI.writeToConsole(self.master, "%.6f | %s is first in the queue and waiting............."%(self.env.now, self.getFirstJobQueued().name))
-					with open("Queue.txt", "r") as myFile:
-						print str(self.env.now) + "::"
-						for eachline in myFile:
-							print eachline# + "     %s\n"%hex(id(self))
-						myFile.close()
-						print "-------------------------------------------------------\n"
-					#print "%s completed, %s"%(Job.name, hex(id(Job)))
-					#print "%s"%(self.jobFinished.succeed())
-					#self.jobFinished = self.env.event()
-					#self.env.process(self.executeJobs(server))  
-					#self.executeJobs(server)
-
-					# INTERUPT ARRIVAL PROCESS TIMEOUT, yet still allow job to arrive on time
-					
-			# Interrupted, update values
-			except simpy.Interrupt:
-				serviceTime = self.env.now - serviceStartTime   
-				Job.realRemainingProcTime -= serviceTime
-				Job.estimatedRemainingProcTime -= serviceTime
-				Job.priority = Job.estimatedRemainingProcTime
-	
-				GUI.writeToConsole(self.master, "%.6f | %s INTERRUPTED, rem proc time %s"%(self.env.now, Job.name, Job.estimatedRemainingProcTime))
-
-				# Add updated job back to file
-				self.arrivalInstance.addJobToFile(Job)
-				#print "added job %s"%Job.name
-				#with open("Queue.txt", "r") as myFile:
-				#	for eachline in myFile:
-				#		print str(self.env.now) + ": " + eachline
-				#	myFile.close()
-				#	print "\n"
-				#print "%s added to queue\n\n\n"%Job.name 
-
-				# Sort queue
-				self.arrivalInstance.sortQueueFile()  
-				#print "sorted queue"             
-
-				# Resource releases current job in order to allow premption
-				server.release(request=req)
 
 
 #----------------------------------------------------------------------#
