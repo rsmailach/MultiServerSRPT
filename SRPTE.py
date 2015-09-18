@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------#
-# SRPTE_SimPy3.py
+# SRPTE.py
 #
 # This application simulates a single server with Poisson arrivals
 # and processing times of a general distribution. There are errors in
@@ -9,9 +9,9 @@
 # Rachel Mailach
 #----------------------------------------------------------------------#
 
-#import simpy 
 from Tkinter import *
 from datetime import datetime
+from math import log
 import copy
 import random
 import tkMessageBox
@@ -95,10 +95,6 @@ class GUI(Tk):
 
 			file.close()
 
-	# Empty queue file at the begining of each simulation
-	def clearQueueFile(self):
-		open('Queue.txt', 'w').close()
-
 	# Empty arrivals file at the begining of each simulation
 	def clearSavedArrivals(self):
 		with open("Arrivals.txt", "w") as myFile:
@@ -144,29 +140,26 @@ class GUI(Tk):
 		self.writeToConsole('Average percent error %.4f\n' %AvgPercError)
 		#self.writeToConsole('Request order: %s' % ArrivalClass.JobOrderIn)
 		self.writeToConsole('Service order: %s\n\n' % MachineClass.JobOrderOut)
-		self.writeToConsole("--------------------------------------------------------------------------------")
-		self.writeToConsole('NOTE: THERE ARE STILL ERRORS WHEN RUNING MULTIPLE SIMULATIONS WITHOUT FIRST QUITTING THE APPLICATION.')
-		self.writeToConsole("--------------------------------------------------------------------------------\n\n\n")
+
 
 				
 	def submit(self, event):
 		self.updateStatusBar("Simulating...")
-		self.clearQueueFile()
 		self.clearSavedArrivals()
-		inputInstance = Input(self)     
+		I = Input(self)     
 
-		self.printParams(inputInstance.valuesList[0], inputInstance.valuesList[1],\
-				 inputInstance.valuesList[2], inputInstance.valuesList[3])
+		self.printParams(I.valuesList[0], I.valuesList[1],\
+						 I.valuesList[2], I.valuesList[3])
 
 		main.timesClicked = 0
 		
 		# Start process
 		MC = MachineClass(self)
-		MC.run(inputInstance.valuesList[0], 'Poisson',\
-				inputInstance.valuesList[1], inputInstance.distList[1],\
-				inputInstance.valuesList[2], inputInstance.valuesList[3])
+		MC.run(I.valuesList[0], 'Poisson',\
+				I.valuesList[1], I.distList[1],\
+				I.valuesList[2], I.valuesList[3])
 
-		#self.displayAverageData()
+		self.displayAverageData()
 		self.updateStatusBar("Simulation complete.")
 
 
@@ -371,6 +364,7 @@ class CustomDist(object):
 			elif self.stringList[i] == "l" and self.stringList[i+1] == "n":
 				self.stringList[i] = "log"
 				self.stringList[i+1] = ""
+		print "".join(self.stringList)
 		return "".join(self.stringList)
 		
 #----------------------------------------------------------------------#
@@ -397,17 +391,6 @@ class LinkedList(object):
 	def __init__(self, head = None):
 		self.head = head
 
-	# ................................... COPIED DIRECTLY ...................................
-	# http://stackoverflow.com/questions/28464077/insert-in-ordered-linked-list-python
-	def printQueue(self):
-		data_list = []    
-		current = self.head
-		while current is not None:
-			data_list.append(str(current.data))
-			current = current.next
-		return '->'.join(data_list)
-    # ................................... COPIED DIRECTLY ...................................
-
     # Insert job into queue (sorted by ERPT)
 	def insert(self, job):
 		current = self.head		# node iterator, starts at head
@@ -419,10 +402,8 @@ class LinkedList(object):
 				previous = current 				# prev = node[i]
 				current = current.nextNode 		# current = node[i+1]
 			
-
-
 			# Insert new node after previous before current
-			if(previous == None):
+			if (previous == None):
 				self.head = Node(job, current)
 			else:
 				previous.nextNode = Node(job, current)
@@ -430,12 +411,22 @@ class LinkedList(object):
 		LinkedList.Size += 1
 
 	# Remove first item in queue
-	def remove(self):
+	def removeHead(self):
 		if (LinkedList.Size > 0):
 			self.head = self.head.nextNode		# move head forward one node
 			LinkedList.Size -= 1
 		else:
 			GUI.writeToConsole(self.master, "ERROR: The linked list is already empty!")
+
+	def clear(self):
+		self.head = None
+
+	def printList(self):
+		current = self.head
+		while (current != None):
+			print current.job.name, current.job.ERPT
+			current = current.nextNode
+
 
 
 #----------------------------------------------------------------------#
@@ -507,19 +498,26 @@ class MachineClass(object):
 	Queue = LinkedList()
 	JobOrderOut = []
 	CurrentTime = 0.0
+	TimeUntilArrival = 0.0
+	#TimeOfArrival = 0.0
 	ServiceStartTime = 0
 	NumJobsInSys = 0
 
 	def __init__(self, master):
 		self.master = master
-		self.timeUntilArrival = 0.0
-		self.timeOfArrival = 0.0
 		self.serverBusy = False
+		MachineClass.Queue.clear()
+		LinkedList.Size = 0
+		MachineClass.CurrentTime = 0.0
+		MachineClass.TimeUntilArrival = 0.0
+		MachineClass.ServiceStartTime = 0
+		MachineClass.NumJobsInSys = 0
 
 		NumJobs = []
 		TimeSys = []
 		ProcTime = []
 		PercError = [] 
+		MachineClass.JobOrderOut = []
 	
 		self.ctr = 0
 
@@ -533,12 +531,6 @@ class MachineClass(object):
 		}
 		return ArrivalDistributions[arrDist]
 	
-	def enqueueJob(self, job):
-		MachineClass.Queue.insert(job)
-
-	def dequeueJob(self):
-		pass
-
 	def getProcessingJob(self):
 		#if(MachineClass.Queue.Size > 0):
 		currentJob = MachineClass.Queue.head.job
@@ -567,11 +559,11 @@ class MachineClass(object):
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
 		if(MachineClass.Queue.Size > 0):
 			self.updateJob()	# update data in queue
-		self.enqueueJob(J)	# add job to queue
+		MachineClass.Queue.insert(J)	# add job to queue
 		self.processJob()	# process first job in queue
 
-		self.timeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
-		self.timeOfArrival = MachineClass.CurrentTime + self.timeUntilArrival
+		MachineClass.TimeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
+		#MachineClass.TimeOfArrival = MachineClass.CurrentTime + MachineClass.TimeUntilArrival
 
 	# Processing first job in queue
 	def processJob(self):
@@ -594,17 +586,19 @@ class MachineClass(object):
 		ProcTime.append(currentJob.procTime)
 		PercError.append(abs(currentJob.percentError))
 
-
-		self.dequeueJob() # remove job from queue
+		MachineClass.Queue.removeHead() # remove job from queue
 		
 
 
 	def run(self, arrRate, arrDist, procRate, procDist, percError, simLength):
 		while 1:
+			if(self.ctr == 0):	# set time of first job arrival
+				MachineClass.TimeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
+
 			# If no jobs in system, or time to arrival is less than remaining processing time of job currently processing
-			if (self.serverBusy == False) or ((self.serverBusy == True) and (self.timeUntilArrival < self.getProcessingJob().RPT)):
+			if (self.serverBusy == False) or ((self.serverBusy == True) and (MachineClass.TimeUntilArrival < self.getProcessingJob().RPT)):
 				#next event is arrival
-				MachineClass.CurrentTime += self.timeUntilArrival
+				MachineClass.CurrentTime += MachineClass.TimeUntilArrival
 
 				# stop server from processing current job
 				self.serverBusy == False
@@ -613,6 +607,8 @@ class MachineClass(object):
 				#next event is job finishing
 				MachineClass.CurrentTime += self.getProcessingJob().RPT
 				self.completionEvent()
+				if(MachineClass.Queue.Size > 0):
+					self.processJob()
 
 			# If current time is greater than the simulation length, end program
 			if MachineClass.CurrentTime > simLength:
