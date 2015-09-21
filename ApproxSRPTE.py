@@ -188,7 +188,7 @@ class Input(LabelFrame):
 		self.arrivalRateInput.set(2.0)          ##################################CHANGE LATER
 		self.processingRateInput.set(0.5)       ##################################CHANGE LATER
 		self.percentErrorInput.set(20)          ##################################CHANGE LATER
-		self.numberOfClassesInput.set(4)	##################################CHANGE LATER
+		self.numberOfClassesInput.set(4)		##################################CHANGE LATER
 		self.simLengthInput.set(50.0)           ##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=1)
@@ -435,7 +435,8 @@ class LinkedList(object):
 
 	def printList(self):
 		current = self.head
-		print "\n%.4f----------------"%(MachineClass.CurrentTime)
+		print "\nJOBS IN QUEUE:"
+		print "%.4f----------------"%(MachineClass.CurrentTime)
 		while (current != None):
 			print "%s, class %s"%(current.job.name, current.job.priorityClass)
 			current = current.nextNode
