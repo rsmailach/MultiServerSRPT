@@ -448,19 +448,13 @@ class JobClass(object):
 
 	# Dictionary of service distributions
 	def setServiceDist(self, procRate, procDist):
-		self.ServiceDistributions =  {
-			'Exponential': self.setExponDist,
-			'Uniform': self.setUniformDist,
-			#'Normal': Rnd.normalvariate(self.ServiceRate)
+		ServiceDistributions =  {
+			'Poisson': random.expovariate(1.0/procRate),
+			'Exponential': random.expovariate(procRate),
+			'Uniform': random.uniform(0.0, procRate),
 			'Custom': self.setCustomDist
 		}
-		return self.ServiceDistributions[procDist](procRate)
-
-	def setExponDist(self, procRate):
-		return random.expovariate(procRate)
-
-	def setUniformDist(self, procRate):
-		return random.uniform(0.0, procRate)
+		return ServiceDistributions[procDist]
 
 	def setCustomDist(self, procRate):
 		if main.timesClicked == 0:
