@@ -99,8 +99,8 @@ class GUI(Tk):
 	# Empty arrivals file at the begining of each simulation
 	def clearSavedArrivals(self):
 		with open("Arrivals.txt", "w") as myFile:
-			myFile.write('Job Name, Req Processing Time, Est Processing Time' + '\n')
-			myFile.close()
+			myFile.write('JOB NAME,      ARRIVAL TIME,     RPT,      ERPT,        CLASS' + '\n')
+		myFile.close()
 
 	def clearConsole(self, event):
 		self.console.config(state=NORMAL)       # make console editable
@@ -410,10 +410,9 @@ class LinkedList(object):
 		if (current == None):	# if queue is empty, set current job as head
 			self.head = Node(job, None)
 		else:
-			while (current != None) and (job.priorityClass > current.job.priorityClass):
+			while (current != None) and (job.priorityClass >= current.job.priorityClass) and (job.name > current.job.name):
 				previous = current 				# prev = node[i]
 				current = current.nextNode 		# current = node[i+1]
-				print current.name
 			
 			# Insert new node after previous before current
 			if (previous == None):
@@ -437,8 +436,9 @@ class LinkedList(object):
 	def printList(self):
 		current = self.head
 		while (current != None):
-			print current.job.name, current.job.ERPT
+			print "%s, class %s"%(current.job.name, current.job.priorityClass)
 			current = current.nextNode
+		print "----------------"
 
 
 
@@ -517,10 +517,11 @@ class MachineClass(object):
 	#TimeOfArrival = 0.0
 	ServiceStartTime = 0
 	NumJobsInSys = 0
+	ServerBusy = False
+	JobInService = None
 
 	def __init__(self, master):
 		self.master = master
-		self.serverBusy = False
 		MachineClass.Queue.clear()
 		MachineClass.PreviousJobs = []
 		LinkedList.Size = 0
@@ -528,6 +529,8 @@ class MachineClass(object):
 		MachineClass.TimeUntilArrival = 0.0
 		MachineClass.ServiceStartTime = 0
 		MachineClass.NumJobsInSys = 0
+		MachineClass.ServerBusy = False
+		MachineClass.JobInService = None
 
 		NumJobs = []
 		TimeSys = []
@@ -547,7 +550,7 @@ class MachineClass(object):
 		}
 		return ArrivalDistributions[arrDist]
 	
-	def getProcessingJob(self):
+	def getFirstJobQueued(self):
 		#if(MachineClass.Queue.Size > 0):
 		currentJob = MachineClass.Queue.head.job
 		return currentJob
@@ -555,22 +558,18 @@ class MachineClass(object):
 		#else:
 		#	GUI.writeToConsole(self.master, "nothing in queue")
 
-
-	#update data
-	def updateJob(self):
-		currentJob = self.getProcessingJob()
-		serviceTime = MachineClass.CurrentTime - MachineClass.ServiceStartTime
-		currentJob.RPT -= serviceTime
-		currentJob.ERPT -= serviceTime
+	def saveArrivals(self, job):
+		text = "%s,       %.4f,      %.4f,      %.4f,      %s"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.priorityClass) + "\n"
+        
+		with open("Arrivals.txt", "a") as myFile:
+			myFile.write(text)
+		myFile.close()
 
 	# Give arriving job it's class and add it to the queue
 	def assignClass(self, numClasses, job):
 		# Remove oldest job from previous jobs list if there are too many
-		self.c = 0
 		while len(MachineClass.PreviousJobs) > (numClasses - 1):
-			c += 1
 			MachineClass.PreviousJobs.pop(0)
-		print ("prev jobs list length: %s"%self.c)
 
 		# Sort previous current job with previous jobs
 		self.SortedPrevJobs = []
@@ -578,16 +577,22 @@ class MachineClass(object):
 		self.SortedPrevJobs.append(job)							# append current job (not a copy)
 		self.SortedPrevJobs.sort(key=lambda JobClass: JobClass.ERPT)
 
+		#GUI.writeToConsole(self.master, "------------------")
+		#for j in self.SortedPrevJobs:
+		#	GUI.writeToConsole(self.master, "%s, class %s"%(j.name, j.priorityClass))
+		#GUI.writeToConsole(self.master, "------------------")
+
 		counter = 1
 		for j in self.SortedPrevJobs:
 			if j.name == job.name:
 				job.priorityClass = counter
 			counter += 1
 
-		GUI.writeToConsole(self.master, "%s assigned class %s"%(job.name, job.priorityClass))
+		##GUI.writeToConsole(self.master, "%s assigned class %s"%(job.name, job.priorityClass))
 
 		# Add current job with new class to queue
 		MachineClass.Queue.insert(job)			# add job to queue
+
 		MachineClass.PreviousJobs.append(job)	# add job to previous jobs queue
 
 
@@ -601,10 +606,13 @@ class MachineClass(object):
 		MachineClass.NumJobsInSys += 1
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
-		if(MachineClass.Queue.Size > 0):
-			self.updateJob()				# update data in queue
+		#if(MachineClass.Queue.Size > 0):
+		#	self.updateJob()				# update data in queue
+
 		self.assignClass(numClasses, J)		# add job to queue
-		self.processJob()					# process first job in queue
+		self.saveArrivals(J)				# Save to list of arrivals, for testing
+		if(MachineClass.ServerBusy == False):
+			self.processJob()					# process first job in queue
 
 		MachineClass.TimeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
 		#MachineClass.TimeOfArrival = MachineClass.CurrentTime + MachineClass.TimeUntilArrival
@@ -612,25 +620,27 @@ class MachineClass(object):
 	# Processing first job in queue
 	def processJob(self):
 		MachineClass.ServiceStartTime = MachineClass.CurrentTime
-		currentJob = self.getProcessingJob()
-		GUI.writeToConsole(self.master, "%.6f | %s processing, ERPT = %.5f"%(MachineClass.CurrentTime, currentJob.name, currentJob.ERPT))
-		self.serverBusy = True
+		MachineClass.JobInService = self.getFirstJobQueued()
+		GUI.writeToConsole(self.master, "%.6f | %s processing, ERPT = %.5f, class = %s"%(MachineClass.CurrentTime, MachineClass.JobInService.name, MachineClass.JobInService.ERPT, MachineClass.JobInService.priorityClass))
+		MachineClass.ServerBusy = True
+
+		MachineClass.Queue.removeHead() # remove job from queue
 
 	# Job completed
 	def completionEvent(self):
-		currentJob = self.getProcessingJob()
-		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, currentJob.name))
+		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, MachineClass.JobInService.name))
 
-		self.serverBusy = False
 
-		MachineClass.JobOrderOut.append(currentJob.name)
+		MachineClass.ServerBusy = False
+
+		MachineClass.JobOrderOut.append(MachineClass.JobInService.name)
 		MachineClass.NumJobsInSys -= 1
 		NumJobs.append(MachineClass.NumJobsInSys)
-		TimeSys.append(MachineClass.CurrentTime - currentJob.arrivalTime)
-		ProcTime.append(currentJob.procTime)
-		PercError.append(abs(currentJob.percentError))
+		TimeSys.append(MachineClass.CurrentTime - MachineClass.JobInService.arrivalTime)
+		ProcTime.append(MachineClass.JobInService.procTime)
+		PercError.append(abs(MachineClass.JobInService.percentError))
 
-		MachineClass.Queue.removeHead() # remove job from queue
+		MachineClass.Queue.printList() # print what is left in queue
 		
 
 
@@ -640,16 +650,14 @@ class MachineClass(object):
 				MachineClass.TimeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
 
 			# If no jobs in system, or time to arrival is less than remaining processing time of job currently processing
-			if (self.serverBusy == False) or ((self.serverBusy == True) and (MachineClass.TimeUntilArrival < self.getProcessingJob().RPT)):
+			if (MachineClass.ServerBusy == False) or ((MachineClass.ServerBusy == True) and (MachineClass.TimeUntilArrival < MachineClass.JobInService.RPT)):
 				#next event is arrival
 				MachineClass.CurrentTime += MachineClass.TimeUntilArrival
-
-				# stop server from processing current job
-				self.serverBusy == False
 				self.arrivalEvent(arrRate, arrDist, procRate, procDist, numClasses, percError)
+
 			else:
 				#next event is job finishing
-				MachineClass.CurrentTime += self.getProcessingJob().RPT
+				MachineClass.CurrentTime += MachineClass.JobInService.RPT
 				self.completionEvent()
 				if(MachineClass.Queue.Size > 0):
 					self.processJob()
