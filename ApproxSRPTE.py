@@ -430,6 +430,7 @@ class LinkedList(object):
 			GUI.writeToConsole(self.master, "ERROR: The linked list is already empty!")
 
 	def clear(self):
+		LinkedList.Size = 0
 		self.head = None
 
 	def printList(self):
@@ -519,7 +520,6 @@ class MachineClass(object):
 		self.master = master
 		MachineClass.Queue.clear()
 		MachineClass.PreviousJobs = []
-		LinkedList.Size = 0
 		MachineClass.CurrentTime = 0.0
 		MachineClass.TimeUntilArrival = 0.0
 		MachineClass.ServiceStartTime = 0
@@ -597,7 +597,7 @@ class MachineClass(object):
 
 		MachineClass.NumJobsInSys += 1
 
-		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
+		GUI.writeToConsole(self.master, "%.6f | %s arrived, RPT = %.5f"%(MachineClass.CurrentTime, J.name, J.RPT))
 
 		self.assignClass(numClasses, J)			# give job a class, and add to queue
 		self.saveArrivals(J)					# save to list of arrivals, for testing
@@ -610,7 +610,8 @@ class MachineClass(object):
 	def processJob(self):
 		MachineClass.ServiceStartTime = MachineClass.CurrentTime
 		MachineClass.JobInService = self.getFirstJobQueued()
-		GUI.writeToConsole(self.master, "%.6f | %s processing, ERPT = %.5f, class = %s"%(MachineClass.CurrentTime, MachineClass.JobInService.name, MachineClass.JobInService.ERPT, MachineClass.JobInService.priorityClass))
+		self.finishTime = MachineClass.CurrentTime + MachineClass.JobInService.RPT
+		GUI.writeToConsole(self.master, "%.6f | %s processing, RPT = %.5f, class = %s, finish = %.5f"%(MachineClass.CurrentTime, MachineClass.JobInService.name, MachineClass.JobInService.RPT, MachineClass.JobInService.priorityClass, self.finishTime))
 		MachineClass.ServerBusy = True
 
 		MachineClass.Queue.removeHead() # remove job from queue
@@ -619,8 +620,6 @@ class MachineClass(object):
 	def completionEvent(self):
 		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, MachineClass.JobInService.name))
 
-		MachineClass.ServerBusy = False
-
 		MachineClass.JobOrderOut.append(MachineClass.JobInService.name)
 		MachineClass.NumJobsInSys -= 1
 		NumJobs.append(MachineClass.NumJobsInSys)
@@ -628,7 +627,10 @@ class MachineClass(object):
 		ProcTime.append(MachineClass.JobInService.procTime)
 		PercError.append(abs(MachineClass.JobInService.percentError))
 
-		MachineClass.Queue.printList() # print what is left in queue
+		MachineClass.ServerBusy = False
+		MachineClass.JobInService = None
+
+		#MachineClass.Queue.printList() # print what is left in queue
 		
 
 
@@ -639,6 +641,13 @@ class MachineClass(object):
 
 			# If no jobs in system, or time to arrival is less than remaining processing time of job currently processing
 			if (MachineClass.ServerBusy == False) or ((MachineClass.ServerBusy == True) and (MachineClass.TimeUntilArrival < MachineClass.JobInService.RPT)):
+				#GUI.writeToConsole(self.master, "server busy %r"%(MachineClass.ServerBusy == False))
+				#GUI.writeToConsole(self.master, "server busy and job arriving %r"%((MachineClass.ServerBusy == True) and (MachineClass.TimeUntilArrival < MachineClass.JobInService.RPT)))
+				#GUI.writeToConsole(self.master, "time until arrival %.4f"%(MachineClass.TimeUntilArrival))
+				#if(MachineClass.JobInService != None):
+				#	GUI.writeToConsole(self.master, "RPT %.4f"%(MachineClass.JobInService.RPT))
+
+
 				#next event is arrival
 				MachineClass.CurrentTime += MachineClass.TimeUntilArrival
 				self.arrivalEvent(arrRate, arrDist, procRate, procDist, numClasses, percError)
@@ -656,8 +665,9 @@ class MachineClass(object):
 
 
 
-
-
+## NOTES: 
+## Sometimes jobs are processing longer than RPT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+##		-while statement does not run enough?
 	
 
 
