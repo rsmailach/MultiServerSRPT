@@ -211,12 +211,12 @@ class Input(LabelFrame):
 
 
 		# Distribution Dropdowns
-		self.distributions = ('Select Distribution', 'Exponential', 'Uniform', 'Custom')
-		#self.comboBox_1 = ttk.Combobox(self, values = self.distributions, state = 'readonly')
-		#self.comboBox_1.current(0) # set selection
-		#self.comboBox_1.grid(row = 0, column = 2)
+		self.distributions = ('Select Distribution', 'Poisson', 'Exponential', 'Uniform', 'Custom')
+		self.comboBox_1 = ttk.Combobox(self, values = self.distributions, state = 'disabled')
+		self.comboBox_1.current(1) # set selection
+		self.comboBox_1.grid(row = 0, column = 3)
 		self.comboBox_2 = ttk.Combobox(self, values = self.distributions, state = 'readonly')
-		self.comboBox_2.current(1) # set default selection                  #####################CHANGE LATER
+		self.comboBox_2.current(2) # set default selection                  #####################CHANGE LATER
 		self.comboBox_2.grid(row = 1, column = 3)
 
 		# Simulate Button
@@ -254,14 +254,14 @@ class Input(LabelFrame):
 				return 0
 
 	def getDropDownValues(self):
-		#if self.comboBox_1.get() == 'Select Distribution': print "Box 1 has to have a selection"
+		comboBox1Value = self.comboBox_1.get()
 		comboBox2Value = self.comboBox_2.get()
 		if comboBox2Value == 'Select Distribution':
 				self.errorMessage.set("You must select a distribution for the processing rate")
 				return 1
 		else:
 				self.errorMessage.set("")
-				Input.distList = ["", comboBox2Value, "", "", ""]
+				Input.distList = [comboBox1Value, comboBox2Value]
 				return 0
 
 #----------------------------------------------------------------------#
