@@ -510,8 +510,8 @@ class MachineClass(object):
 	PreviousJobs = []
 	JobOrderOut = []
 	CurrentTime = 0.0
-	TimeUntilArrival = 0.0
-	ServiceStartTime = 0
+	NextArrival = 0.0
+	ServiceFinishTime = 0
 	NumJobsInSys = 0
 	ServerBusy = False
 	JobInService = None
@@ -521,8 +521,8 @@ class MachineClass(object):
 		MachineClass.Queue.clear()
 		MachineClass.PreviousJobs = []
 		MachineClass.CurrentTime = 0.0
-		MachineClass.TimeUntilArrival = 0.0
-		MachineClass.ServiceStartTime = 0
+		MachineClass.NextArrival = 0.0
+		MachineClass.ServiceFinishTime = 0
 		MachineClass.NumJobsInSys = 0
 		MachineClass.ServerBusy = False
 		MachineClass.JobInService = None
@@ -604,14 +604,13 @@ class MachineClass(object):
 		if(MachineClass.ServerBusy == False):
 			self.processJob()					# process first job in queue
 
-		MachineClass.TimeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
+		MachineClass.NextArrival = MachineClass.CurrentTime + self.setArrivalDist(arrRate, arrDist) # generate next arrival
 
 	# Processing first job in queue
 	def processJob(self):
-		MachineClass.ServiceStartTime = MachineClass.CurrentTime
 		MachineClass.JobInService = self.getFirstJobQueued()
-		self.finishTime = MachineClass.CurrentTime + MachineClass.JobInService.RPT
-		GUI.writeToConsole(self.master, "%.6f | %s processing, RPT = %.5f, class = %s, finish = %.5f"%(MachineClass.CurrentTime, MachineClass.JobInService.name, MachineClass.JobInService.RPT, MachineClass.JobInService.priorityClass, self.finishTime))
+		MachineClass.ServiceFinishTime = MachineClass.CurrentTime + MachineClass.JobInService.RPT
+		GUI.writeToConsole(self.master, "%.6f | %s processing, RPT = %.5f, class = %s, finish = %.5f"%(MachineClass.CurrentTime, MachineClass.JobInService.name, MachineClass.JobInService.RPT, MachineClass.JobInService.priorityClass, MachineClass.ServiceFinishTime))
 		MachineClass.ServerBusy = True
 
 		MachineClass.Queue.removeHead() # remove job from queue
@@ -637,38 +636,33 @@ class MachineClass(object):
 	def run(self, arrRate, arrDist, procRate, procDist, percError, numClasses, simLength):
 		while 1:
 			if(self.ctr == 0):	# set time of first job arrival
-				MachineClass.TimeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
+				MachineClass.NextArrival = MachineClass.CurrentTime + self.setArrivalDist(arrRate, arrDist) # generate next arrival
+
+
+			#if(MachineClass.JobInService != None):
+				#GUI.writeToConsole(self.master, "----------------------%.4f, %s RPT %.4f"%(MachineClass.CurrentTime, MachineClass.JobInService.name, MachineClass.JobInService.RPT))
+				#GUI.writeToConsole(self.master, "---------------------- %s finish %.4f"%(MachineClass.JobInService.name, MachineClass.ServiceFinishTime))
+			#	GUI.writeToConsole(self.master, "---------------------- Job arrival %.4f"%(MachineClass.NextArrival))
+
 
 			# If no jobs in system, or time to arrival is less than remaining processing time of job currently processing
-			if (MachineClass.ServerBusy == False) or ((MachineClass.ServerBusy == True) and (MachineClass.TimeUntilArrival < MachineClass.JobInService.RPT)):
-				#GUI.writeToConsole(self.master, "server busy %r"%(MachineClass.ServerBusy == False))
-				#GUI.writeToConsole(self.master, "server busy and job arriving %r"%((MachineClass.ServerBusy == True) and (MachineClass.TimeUntilArrival < MachineClass.JobInService.RPT)))
-				#GUI.writeToConsole(self.master, "time until arrival %.4f"%(MachineClass.TimeUntilArrival))
-				#if(MachineClass.JobInService != None):
-				#	GUI.writeToConsole(self.master, "RPT %.4f"%(MachineClass.JobInService.RPT))
-
-
+			if (MachineClass.ServerBusy == False) or ((MachineClass.ServerBusy == True) and (MachineClass.NextArrival < MachineClass.ServiceFinishTime)):
 				#next event is arrival
-				MachineClass.CurrentTime += MachineClass.TimeUntilArrival
+				MachineClass.CurrentTime = MachineClass.NextArrival
 				self.arrivalEvent(arrRate, arrDist, procRate, procDist, numClasses, percError)
 
 			else:
 				#next event is job finishing
-				MachineClass.CurrentTime += MachineClass.JobInService.RPT
+				MachineClass.CurrentTime = MachineClass.ServiceFinishTime
 				self.completionEvent()
+
 				if(MachineClass.Queue.Size > 0):
 					self.processJob()
+
 
 			# If current time is greater than the simulation length, end program
 			if MachineClass.CurrentTime > simLength:
 				break
-
-
-
-## NOTES: 
-## Sometimes jobs are processing longer than RPT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-##		-while statement does not run enough?
-	
 
 
 
