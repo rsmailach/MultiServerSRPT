@@ -41,11 +41,11 @@ class GUI(Tk):
 
 		# Create the input frame
 		self.frameIn = Input(self)
-		self.frameIn.pack(side=TOP, fill=BOTH, padx = 5, pady =5, ipadx = 5, ipady = 5)     
+		self.frameIn.pack(side=TOP, fill=X, expand=False, padx = 5, pady =5, ipadx = 5, ipady = 5)     
 
 		# Create the output frame
 		self.frameOut = Output(self)
-		self.frameOut.pack(side=TOP, fill=BOTH, padx = 5, pady =5, ipadx = 5, ipady = 5)
+		self.frameOut.pack(side=TOP, fill=BOTH, expand=True, padx = 5, pady =5, ipadx = 5, ipady = 5)
 
 		# Bind simulate button
 		self.bind("<<input_simulate>>", self.submit)
@@ -67,14 +67,22 @@ class GUI(Tk):
 
 	def makeConsole(self):
 		consoleFrame = Frame(self.frameOut)
-		consoleFrame.pack(side=TOP, padx=5, pady=5)
+		consoleFrame.pack(side=TOP, expand=True, fill=BOTH, padx=5, pady=5)
+
 		self.console = Text(consoleFrame, wrap = WORD)
-		self.console.config(state=DISABLED)     # start with console as disabled (non-editable)
 		scrollbar = Scrollbar(consoleFrame)
+
+		self.console.config(state=DISABLED)     # start with console as disabled (non-editable)
 		scrollbar.config(command = self.console.yview)
 		self.console.config(yscrollcommand=scrollbar.set)
-		self.console.grid(column=0, row=0)
+
+		self.console.grid(column=0, row=0, sticky='NSEW')
 		scrollbar.grid(column=1, row=0, sticky='NS')
+
+		#DOES NOTHING??
+		self.grid_columnconfigure(0, weight=1) 
+		self.grid_rowconfigure(0, weight=1)
+
 
 	def writeToConsole(self, text = ' '):
 		self.console.config(state=NORMAL)       # make console editable
@@ -111,7 +119,7 @@ class GUI(Tk):
 		self.statusText.set(text)
 	
 	def printIntro(self):
-		self.writeToConsole("SRPTE \n\n This application simulates a single server with Poisson arrivals and processing times of a general distribution. Each arrival has an estimation error within a percent error taken as input. Jobs are serviced in order of shortest remaining processing time.")
+		self.writeToConsole("Approximate SRPTE \n\n This application simulates a single server with Poisson arrivals and processing times of a general distribution. There are errors in time estimates within a range. Arrivals are assigned to SRPT classes using the methods described in Adaptive and Scalable Comparison Scheduling.")
 
 	def printParams(self, arrRate, procRate, percError, numClasses, simLength): 
 		self.writeToConsole("--------------------------------------------------------------------------------")
@@ -129,17 +137,36 @@ class GUI(Tk):
 		return var/len(List)
 
 	def displayAverageData(self):
-		AvgNumJobs = int(float(sum(NumJobs))/len(NumJobs))
-		AvgTimeSys = float(sum(TimeSys))/len(TimeSys)
-		AvgProcTime = float(sum(ProcTime))/len(ProcTime)
-		VarProcTime = self.calcVariance(ProcTime, AvgProcTime)
-		AvgPercError = float(sum(PercError))/len(PercError)
+		try:
+			AvgNumJobs = int(float(sum(NumJobs))/len(NumJobs))
+		except ZeroDivisionError:
+			AvgNumJobs = 0
 
-		self.writeToConsole('\n\nAverage number of jobs in the system %s' %AvgNumJobs)
-		self.writeToConsole('Average time in system, from start to completion is %s' %AvgTimeSys)
-		self.writeToConsole('Average processing time, based on generated service times is %s' %AvgProcTime)
-		self.writeToConsole('Variance of processing time %s' %VarProcTime)
-		self.writeToConsole('Average percent error %.4f\n' %AvgPercError)
+		try:
+			AvgTimeSys = float(sum(TimeSys))/len(TimeSys)
+		except ZeroDivisionError:
+			AvgTimeSys = 0.0
+
+		try:
+			AvgProcTime = float(sum(ProcTime))/len(ProcTime)
+		except ZeroDivisionError:
+			AvgProcTime = 0.0
+
+		try:
+			VarProcTime = self.calcVariance(ProcTime, AvgProcTime)
+		except ZeroDivisionError:
+			VarProcTime = 0.0
+
+		try:
+			AvgPercError = float(sum(PercError))/len(PercError)
+		except ZeroDivisionError:
+			AvgPercError = 0.0
+
+		self.writeToConsole('\n\nAverage number of jobs in the system: %.6f' %AvgNumJobs)
+		self.writeToConsole('Average time in system, from start to completion: %.6f' %AvgTimeSys)
+		self.writeToConsole('Average processing time, based on generated service times: %.6f' %AvgProcTime)
+		self.writeToConsole('Variance of processing time: %.6f' %VarProcTime)
+		self.writeToConsole('Average percent error: %.2f\n' %AvgPercError)
 		#self.writeToConsole('Request order: %s' % ArrivalClass.JobOrderIn)
 		self.writeToConsole('Service order: %s\n\n' % MachineClass.JobOrderOut)
 
@@ -184,10 +211,10 @@ class Input(LabelFrame):
 		self.simLengthInput = DoubleVar()
 		self.errorMessage = StringVar()
 
-		self.arrivalRateInput.set(2.0)          ##################################CHANGE LATER
+		self.arrivalRateInput.set(1.0)          ##################################CHANGE LATER
 		self.processingRateInput.set(0.5)       ##################################CHANGE LATER
 		self.percentErrorInput.set(20)          ##################################CHANGE LATER
-		self.numberOfClassesInput.set(4)		##################################CHANGE LATER
+		self.numberOfClassesInput.set(8)		##################################CHANGE LATER
 		self.simLengthInput.set(50.0)           ##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=1)
@@ -253,7 +280,7 @@ class Input(LabelFrame):
 		if processingRate <= 0.0:
 				self.errorMessage.set("Processing rate must be non-zero value!")
 				return 1
-		if numberOfClasses <= 1.0:
+		if numberOfClasses < 1.0:
 				self.errorMessage.set("There must be at least one class!")
 				return 1		
 		if maxSimLength <= 0.0:
@@ -519,7 +546,7 @@ class MachineClass(object):
 	def __init__(self, master):
 		self.master = master
 		MachineClass.Queue.clear()
-		MachineClass.PreviousJobs = []
+		MachineClass.PreviousJobs[:] = []
 		MachineClass.CurrentTime = 0.0
 		MachineClass.NextArrival = 0.0
 		MachineClass.ServiceFinishTime = 0
@@ -527,11 +554,11 @@ class MachineClass(object):
 		MachineClass.ServerBusy = False
 		MachineClass.JobInService = None
 
-		NumJobs = []
-		TimeSys = []
-		ProcTime = []
-		PercError = [] 
-		MachineClass.JobOrderOut = []
+		NumJobs[:] = []
+		TimeSys[:] = []
+		ProcTime[:] = []
+		PercError[:] = [] 
+		MachineClass.JobOrderOut[:] = []
 	
 		self.ctr = 0
 
@@ -572,20 +599,22 @@ class MachineClass(object):
 		self.SortedPrevJobs.append(job)							# append current job (not a copy)
 		self.SortedPrevJobs.sort(key=lambda JobClass: JobClass.ERPT)
 
-		#GUI.writeToConsole(self.master, "------------------")
-		#for j in self.SortedPrevJobs:
-		#	GUI.writeToConsole(self.master, "%s, class %s"%(j.name, j.priorityClass))
-		#GUI.writeToConsole(self.master, "------------------")
-
 		counter = 1
 		for j in self.SortedPrevJobs:
 			if j.name == job.name:
 				job.priorityClass = counter
 			counter += 1
 
+		#GUI.writeToConsole(self.master, "------------------")
+		#for j in self.SortedPrevJobs:
+		#	GUI.writeToConsole(self.master, "%s, class %s"%(j.name, j.priorityClass))
+		#GUI.writeToConsole(self.master, "------------------")
+
 		# Add current job with new class to queue
 		MachineClass.Queue.insert(job)			# add job to queue
 		MachineClass.PreviousJobs.append(job)	# add job to previous jobs queue
+
+		#MachineClass.Queue.printList() # print what is left in queue
 
 
 	# Job arriving
@@ -610,7 +639,7 @@ class MachineClass(object):
 	def processJob(self):
 		MachineClass.JobInService = self.getFirstJobQueued()
 		MachineClass.ServiceFinishTime = MachineClass.CurrentTime + MachineClass.JobInService.RPT
-		GUI.writeToConsole(self.master, "%.6f | %s processing, RPT = %.5f, class = %s, finish = %.5f"%(MachineClass.CurrentTime, MachineClass.JobInService.name, MachineClass.JobInService.RPT, MachineClass.JobInService.priorityClass, MachineClass.ServiceFinishTime))
+		GUI.writeToConsole(self.master, "%.6f | %s processing, RPT = %.5f, class = %s"%(MachineClass.CurrentTime, MachineClass.JobInService.name, MachineClass.JobInService.RPT, MachineClass.JobInService.priorityClass))
 		MachineClass.ServerBusy = True
 
 		MachineClass.Queue.removeHead() # remove job from queue
@@ -635,15 +664,9 @@ class MachineClass(object):
 
 	def run(self, arrRate, arrDist, procRate, procDist, percError, numClasses, simLength):
 		while 1:
-			if(self.ctr == 0):	# set time of first job arrival
-				MachineClass.NextArrival = MachineClass.CurrentTime + self.setArrivalDist(arrRate, arrDist) # generate next arrival
-
-
-			#if(MachineClass.JobInService != None):
-				#GUI.writeToConsole(self.master, "----------------------%.4f, %s RPT %.4f"%(MachineClass.CurrentTime, MachineClass.JobInService.name, MachineClass.JobInService.RPT))
-				#GUI.writeToConsole(self.master, "---------------------- %s finish %.4f"%(MachineClass.JobInService.name, MachineClass.ServiceFinishTime))
-			#	GUI.writeToConsole(self.master, "---------------------- Job arrival %.4f"%(MachineClass.NextArrival))
-
+			# Generate time of first job arrival
+			if(self.ctr == 0):
+				MachineClass.NextArrival = MachineClass.CurrentTime + self.setArrivalDist(arrRate, arrDist)
 
 			# If no jobs in system, or time to arrival is less than remaining processing time of job currently processing
 			if (MachineClass.ServerBusy == False) or ((MachineClass.ServerBusy == True) and (MachineClass.NextArrival < MachineClass.ServiceFinishTime)):
@@ -658,7 +681,6 @@ class MachineClass(object):
 
 				if(MachineClass.Queue.Size > 0):
 					self.processJob()
-
 
 			# If current time is greater than the simulation length, end program
 			if MachineClass.CurrentTime > simLength:

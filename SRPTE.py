@@ -98,7 +98,7 @@ class GUI(Tk):
 	# Empty arrivals file at the begining of each simulation
 	def clearSavedArrivals(self):
 		with open("Arrivals.txt", "w") as myFile:
-			myFile.write('Job Name, Req Processing Time, Est Processing Time' + '\n')
+			myFile.write('Job Name,      Arrival Time,      RPT,       ERPT' + '\n')
 			myFile.close()
 
 	def clearConsole(self, event):
@@ -549,6 +549,7 @@ class MachineClass(object):
 		self.ctr += 1
 
 		MachineClass.NumJobsInSys += 1
+		self.saveArrivals(J)					# save to list of arrivals, for testing
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
 		if(MachineClass.Queue.Size > 0):
@@ -558,6 +559,13 @@ class MachineClass(object):
 
 		MachineClass.TimeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
 		#MachineClass.TimeOfArrival = MachineClass.CurrentTime + MachineClass.TimeUntilArrival
+
+	def saveArrivals(self, job):
+		text = "%s,       %.4f,      %.4f,      %.4f"%(job.name, job.arrivalTime, job.RPT, job.ERPT) + "\n"
+        
+		with open("Arrivals.txt", "a") as myFile:
+			myFile.write(text)
+		myFile.close()
 
 	# Processing first job in queue
 	def processJob(self):
