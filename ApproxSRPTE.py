@@ -538,6 +538,7 @@ class MachineClass(object):
 	JobOrderOut = []
 	CurrentTime = 0.0
 	NextArrival = 0.0
+	ServiceStartTime = 0
 	ServiceFinishTime = 0
 	NumJobsInSys = 0
 	ServerBusy = False
@@ -549,6 +550,7 @@ class MachineClass(object):
 		MachineClass.PreviousJobs[:] = []
 		MachineClass.CurrentTime = 0.0
 		MachineClass.NextArrival = 0.0
+		MachineClass.ServiceStartTime = 0
 		MachineClass.ServiceFinishTime = 0
 		MachineClass.NumJobsInSys = 0
 		MachineClass.ServerBusy = False
@@ -572,13 +574,20 @@ class MachineClass(object):
 		}
 		return ArrivalDistributions[arrDist]
 	
-	def getFirstJobQueued(self):
+	def getProcessingJob(self):
 		#if(MachineClass.Queue.Size > 0):
 		currentJob = MachineClass.Queue.head.job
 		return currentJob
 		
 		#else:
 		#	GUI.writeToConsole(self.master, "nothing in queue")
+
+	#update data
+	def updateJob(self):
+		currentJob = self.getProcessingJob()
+		serviceTime = MachineClass.CurrentTime - MachineClass.ServiceStartTime
+		currentJob.RPT -= serviceTime
+		currentJob.ERPT -= serviceTime
 
 	def saveArrivals(self, job):
 		text = "%s,       %.4f,      %.4f,      %.4f,      %s"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.priorityClass) + "\n"
@@ -626,23 +635,27 @@ class MachineClass(object):
 
 		MachineClass.NumJobsInSys += 1
 
-		GUI.writeToConsole(self.master, "%.6f | %s arrived, RPT = %.5f"%(MachineClass.CurrentTime, J.name, J.RPT))
+		if(MachineClass.Queue.Size > 0):
+			self.updateJob()	# update data in queue	
 
 		self.assignClass(numClasses, J)			# give job a class, and add to queue
+
+		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass))
+
 		self.saveArrivals(J)					# save to list of arrivals, for testing
-		if(MachineClass.ServerBusy == False):
-			self.processJob()					# process first job in queue
+		self.processJob()						# process first job in queue
 
 		MachineClass.NextArrival = MachineClass.CurrentTime + self.setArrivalDist(arrRate, arrDist) # generate next arrival
 
 	# Processing first job in queue
 	def processJob(self):
-		MachineClass.JobInService = self.getFirstJobQueued()
+		MachineClass.ServiceStartTime = MachineClass.CurrentTime
+		MachineClass.JobInService = self.getProcessingJob()
 		MachineClass.ServiceFinishTime = MachineClass.CurrentTime + MachineClass.JobInService.RPT
-		GUI.writeToConsole(self.master, "%.6f | %s processing, RPT = %.5f, class = %s"%(MachineClass.CurrentTime, MachineClass.JobInService.name, MachineClass.JobInService.RPT, MachineClass.JobInService.priorityClass))
+		GUI.writeToConsole(self.master, "%.6f | %s processing, class = %s"%(MachineClass.CurrentTime, MachineClass.JobInService.name, MachineClass.JobInService.priorityClass))
 		MachineClass.ServerBusy = True
 
-		MachineClass.Queue.removeHead() # remove job from queue
+		#MachineClass.Queue.removeHead() # remove job from queue
 
 	# Job completed
 	def completionEvent(self):
@@ -658,7 +671,9 @@ class MachineClass(object):
 		MachineClass.ServerBusy = False
 		MachineClass.JobInService = None
 
-		#MachineClass.Queue.printList() # print what is left in queue
+		MachineClass.Queue.removeHead() # remove job from queue
+
+		#MachineClass.Queue.printList() 	# print what is left in queue
 		
 
 
@@ -672,6 +687,10 @@ class MachineClass(object):
 			if (MachineClass.ServerBusy == False) or ((MachineClass.ServerBusy == True) and (MachineClass.NextArrival < MachineClass.ServiceFinishTime)):
 				#next event is arrival
 				MachineClass.CurrentTime = MachineClass.NextArrival
+
+				# stop server from processing current job
+				self.ServerBusy == False
+
 				self.arrivalEvent(arrRate, arrDist, procRate, procDist, numClasses, percError)
 
 			else:
