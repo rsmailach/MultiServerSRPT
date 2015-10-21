@@ -245,7 +245,7 @@ class Input(LabelFrame):
 
 
 		# Distribution Dropdowns
-		self.distributions = ('Select Distribution', 'Poisson', 'Exponential', 'Uniform', 'Custom')
+		self.distributions = ('Select Distribution', 'Poisson', 'Exponential', 'Uniform', 'Bounded Pareto', 'Custom')
 		self.comboBox_1 = ttk.Combobox(self, values = self.distributions, state = 'disabled')
 		self.comboBox_1.current(1) # set selection
 		self.comboBox_1.grid(row = 0, column = 3)
@@ -361,8 +361,8 @@ class CustomDist(object):
 		self.mu=Button(frame2, text=u'\u03bc', command=self.insertMu)
 		self.mu.pack(side=LEFT)
 
-		self.u=Button(frame2, text="u", command=self.insertU)
-		self.u.pack(side=LEFT)
+		self.x=Button(frame2, text="x", command=self.insertX)
+		self.x.pack(side=LEFT)
 
 		self.ln=Button(frame2, text="ln", command=self.insertLn)
 		self.ln.pack(side=LEFT)
@@ -371,7 +371,7 @@ class CustomDist(object):
 		frame3 = Frame(top)
 		frame3.pack(side=TOP, padx=5, pady=5)
 		self.e = Entry(frame3, textvariable = self.function)
-		self.e.insert(0, "-(1/" + u'\u03bc' + ")*ln(u)")
+		self.e.insert(0, "-ln(1 - x)/" + u'\u03bc')
 		self.e.pack(fill="both", expand=True)
 
 		frame4 = Frame(top)
@@ -386,8 +386,8 @@ class CustomDist(object):
 	def insertMu(self):
 		self.e.insert(END, u'\u03bc')
 
-	def insertU(self):
-		self.e.insert(END, "u")
+	def insertX(self):
+		self.e.insert(END, "x")
 
 	def insertLn(self):
 		self.e.insert(END, "ln")
@@ -397,7 +397,7 @@ class CustomDist(object):
 		for i in range(len(self.stringList)):
 			if self.stringList[i] == u'\u03bc':
 				self.stringList[i] = "procRate"
-			elif self.stringList[i] == "u":
+			elif self.stringList[i] == "x":
 				self.stringList[i] = "random.uniform(0.0, 1.0)"
 			elif self.stringList[i] == "l" and self.stringList[i+1] == "n":
 				self.stringList[i] = "log"
@@ -496,9 +496,13 @@ class JobClass(object):
 			'Poisson': random.expovariate(1.0/procRate),
 			'Exponential': random.expovariate(procRate),
 			'Uniform': random.uniform(0.0, procRate),
+			'Bounded Pareto': self.setBoundedPareto,			
 			'Custom': self.setCustomDist
 		}
-		return ServiceDistributions[procDist]
+		if(procDist == 'Custom' or procDist == 'Bounded Pareto'):
+			return ServiceDistributions[procDist](procRate)
+		else:
+			return ServiceDistributions[procDist]
 
 	def setCustomDist(self, procRate):
 		if main.timesClicked == 0:
@@ -507,6 +511,23 @@ class JobClass(object):
 			self.master.wait_window(self.popup.top)
 			main.customEquation = self.popup.stringEquation
 		return eval(main.customEquation)
+
+	def setBoundedPareto(self, procRate):
+		## reset lambda, to maintain load
+		## lambda/mu(pareto) = constant
+		alpha = 1.5		# Shape, power of tail, alpha = 2 is approx Expon., alpha = 1 gives higher variance
+		L = 10**(-2)	# Smallest job size
+		U = 10**6		# Largest job size
+
+		if (alpha < 0) or (U < L) or (L < 0):
+			print "ERROR: Bounded pareto paramater error"
+
+		x = random.uniform(0.0, 1.0)
+
+		paretoNumerator = float(-(x*U**alpha - x*L**alpha - U**alpha))
+		paretoDenominator = float(U**alpha * L**alpha)
+		main.customEquation = (paretoNumerator/paretoDenominator)**(-1/alpha)
+		return main.customEquation		
 
 	# Generates a percent error for processing time
 	def generateError(self, percError):

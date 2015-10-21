@@ -12,6 +12,8 @@
 from Tkinter import *
 from datetime import datetime
 from math import log
+import plotly.plotly as py
+from plotly.graph_objs import Scatter
 import copy
 import random
 import tkMessageBox
@@ -21,6 +23,7 @@ import csv
 import operator
 
 NumJobs = []
+NumJobsTime = []
 TimeSys = []
 ProcTime = []
 PercError = []
@@ -120,6 +123,13 @@ class GUI(Tk):
 		self.writeToConsole("% Error  = " + u"\u00B1" + " %.4f"%percError)
 		self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
 
+
+	def plotNumJobsInSys(self):
+		trace0 = Scatter(x=NumJobsTime, y=NumJobs)
+		data = [trace0]
+		unique_url = py.plot(data, filename = 'SRPT_NumJobsInSys')
+
+
 	def calcVariance(self, List, avg):
 		var = 0
 		for i in List:
@@ -127,6 +137,7 @@ class GUI(Tk):
 		return var/len(List)
 
 	def displayAverageData(self):
+		self.plotNumJobsInSys()
 		AvgNumJobs = int(float(sum(NumJobs))/len(NumJobs))
 		AvgTimeSys = float(sum(TimeSys))/len(TimeSys)
 		AvgProcTime = float(sum(ProcTime))/len(ProcTime)
@@ -155,9 +166,10 @@ class GUI(Tk):
 		
 		# Start process
 		MC = MachineClass(self)
-		MC.run(I.valuesList[0], 'Poisson',\
-				I.valuesList[1], I.distList[1],\
-				I.valuesList[2], I.valuesList[3])
+		MC.run(	I.valuesList[0], 'Poisson',		#arrival
+				I.valuesList[1], I.distList[1],	# processing
+				I.valuesList[2], 				# error
+				I.valuesList[3])				# sim time
 
 		self.displayAverageData()
 		self.updateStatusBar("Simulation complete.")
@@ -180,10 +192,10 @@ class Input(LabelFrame):
 		self.simLengthInput = DoubleVar()
 		self.errorMessage = StringVar()
 
-		self.arrivalRateInput.set(2.0)          ##################################CHANGE LATER
-		self.processingRateInput.set(0.5)       ##################################CHANGE LATER
-		self.percentErrorInput.set(20)          ##################################CHANGE LATER
-		self.simLengthInput.set(50.0)           ##################################CHANGE LATER
+		self.arrivalRateInput.set(0.8)        	   ##################################CHANGE LATER
+		self.processingRateInput.set(0.5)    	   ##################################CHANGE LATER
+		self.percentErrorInput.set(20)        	   ##################################CHANGE LATER
+		self.simLengthInput.set(500.0)            ##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=1)
 		self.grid_rowconfigure(0, weight=1)
@@ -211,12 +223,12 @@ class Input(LabelFrame):
 
 
 		# Distribution Dropdowns
-		self.distributions = ('Select Distribution', 'Poisson', 'Exponential', 'Uniform', 'Custom')
+		self.distributions = ('Select Distribution', 'Poisson', 'Exponential', 'Uniform', 'Bounded Pareto', 'Custom')
 		self.comboBox_1 = ttk.Combobox(self, values = self.distributions, state = 'disabled')
 		self.comboBox_1.current(1) # set selection
 		self.comboBox_1.grid(row = 0, column = 3)
 		self.comboBox_2 = ttk.Combobox(self, values = self.distributions, state = 'readonly')
-		self.comboBox_2.current(2) # set default selection                  #####################CHANGE LATER
+		self.comboBox_2.current(4) # set default selection                  #####################CHANGE LATER
 		self.comboBox_2.grid(row = 1, column = 3)
 
 		# Simulate Button
@@ -231,27 +243,27 @@ class Input(LabelFrame):
 
 	def getNumericValues(self):
 		try:
-				arrivalRate = self.arrivalRateInput.get()
-				processingRate = self.processingRateInput.get()
-				percentError = self.percentErrorInput.get()
-				maxSimLength = self.simLengthInput.get()
+			arrivalRate = self.arrivalRateInput.get()
+			processingRate = self.processingRateInput.get()
+			percentError = self.percentErrorInput.get()
+			maxSimLength = self.simLengthInput.get()
 		except ValueError:
-				self.errorMessage.set("One of your inputs is an incorrect type, try again.")
-				return 1
+			self.errorMessage.set("One of your inputs is an incorrect type, try again.")
+			return 1
 
 		if arrivalRate <= 0.0:
-				self.errorMessage.set("Arrival rate must be non-zero value!")
-				return 1
+			self.errorMessage.set("Arrival rate must be non-zero value!")
+			return 1
 		if processingRate <= 0.0:
-				self.errorMessage.set("Processing rate must be non-zero value!")
-				return 1
+			self.errorMessage.set("Processing rate must be non-zero value!")
+			return 1
 		if maxSimLength <= 0.0:
-				self.errorMessage.set("Simulation length must be non-zero value!")
-				return 1
+			self.errorMessage.set("Simulation length must be non-zero value!")
+			return 1
 		else:
-				self.errorMessage.set("")
-				Input.valuesList = [arrivalRate, processingRate, percentError, maxSimLength]
-				return 0
+			self.errorMessage.set("")
+			Input.valuesList = [arrivalRate, processingRate, percentError, maxSimLength]
+			return 0
 
 	def getDropDownValues(self):
 		comboBox1Value = self.comboBox_1.get()
@@ -263,6 +275,7 @@ class Input(LabelFrame):
 				self.errorMessage.set("")
 				Input.distList = [comboBox1Value, comboBox2Value]
 				return 0
+
 
 #----------------------------------------------------------------------#
 # Class: Output
@@ -323,8 +336,8 @@ class CustomDist(object):
 		self.mu=Button(frame2, text=u'\u03bc', command=self.insertMu)
 		self.mu.pack(side=LEFT)
 
-		self.u=Button(frame2, text="u", command=self.insertU)
-		self.u.pack(side=LEFT)
+		self.x=Button(frame2, text="x", command=self.insertX)
+		self.x.pack(side=LEFT)
 
 		self.ln=Button(frame2, text="ln", command=self.insertLn)
 		self.ln.pack(side=LEFT)
@@ -333,7 +346,7 @@ class CustomDist(object):
 		frame3 = Frame(top)
 		frame3.pack(side=TOP, padx=5, pady=5)
 		self.e = Entry(frame3, textvariable = self.function)
-		self.e.insert(0, "-(1/" + u'\u03bc' + ")*ln(u)")
+		self.e.insert(0, "-ln(1 - x)/" + u'\u03bc')
 		self.e.pack(fill="both", expand=True)
 
 		frame4 = Frame(top)
@@ -348,8 +361,8 @@ class CustomDist(object):
 	def insertMu(self):
 		self.e.insert(END, u'\u03bc')
 
-	def insertU(self):
-		self.e.insert(END, "u")
+	def insertX(self):
+		self.e.insert(END, "x")
 
 	def insertLn(self):
 		self.e.insert(END, "ln")
@@ -359,14 +372,15 @@ class CustomDist(object):
 		for i in range(len(self.stringList)):
 			if self.stringList[i] == u'\u03bc':
 				self.stringList[i] = "procRate"
-			elif self.stringList[i] == "u":
+			elif self.stringList[i] == "x":
 				self.stringList[i] = "random.uniform(0.0, 1.0)"
 			elif self.stringList[i] == "l" and self.stringList[i+1] == "n":
 				self.stringList[i] = "log"
 				self.stringList[i+1] = ""
 		print "".join(self.stringList)
 		return "".join(self.stringList)
-		
+
+
 #----------------------------------------------------------------------#
 # Class: Node
 #
@@ -377,6 +391,7 @@ class Node():
 	def __init__(self, job, nextNode = None):
 		self.job = job
 		self.nextNode = nextNode
+
 
 #----------------------------------------------------------------------#
 # Class: LinkedList
@@ -428,7 +443,6 @@ class LinkedList(object):
 			current = current.nextNode
 
 
-
 #----------------------------------------------------------------------#
 # Class: JobClass
 #
@@ -452,17 +466,39 @@ class JobClass(object):
 			'Poisson': random.expovariate(1.0/procRate),
 			'Exponential': random.expovariate(procRate),
 			'Uniform': random.uniform(0.0, procRate),
+			'Bounded Pareto': self.setBoundedPareto,
 			'Custom': self.setCustomDist
 		}
-		return ServiceDistributions[procDist]
+		if(procDist == 'Custom' or procDist == 'Bounded Pareto'):
+			return ServiceDistributions[procDist](procRate)
+		else:
+			return ServiceDistributions[procDist]
 
 	def setCustomDist(self, procRate):
 		if main.timesClicked == 0:
 			main.timesClicked += 1
-			self.popup=CustomDist(self.master)
+			self.popup = CustomDist(self.master)
 			self.master.wait_window(self.popup.top)
 			main.customEquation = self.popup.stringEquation
 		return eval(main.customEquation)
+
+	def setBoundedPareto(self, procRate):
+		## reset lambda, to maintain load
+		## lambda/mu(pareto) = constant
+		alpha = 1.5		# Shape, power of tail, alpha = 2 is approx Expon., alpha = 1 gives higher variance
+		L = 10**(-2)	# Smallest job size
+		U = 10**6		# Largest job size
+
+		if (alpha < 0) or (U < L) or (L < 0):
+			print "ERROR: Bounded pareto paramater error"
+
+		x = random.uniform(0.0, 1.0)
+
+		paretoNumerator = float(-(x*U**alpha - x*L**alpha - U**alpha))
+		paretoDenominator = float(U**alpha * L**alpha)
+		main.customEquation = (paretoNumerator/paretoDenominator)**(-1/alpha)
+		return main.customEquation
+
 
 	# Generates a percent error for processing time
 	def generateError(self, percError):
@@ -508,6 +544,7 @@ class MachineClass(object):
 		MachineClass.NumJobsInSys = 0
 
 		NumJobs = []
+		NumJobsTime = []
 		TimeSys = []
 		ProcTime = []
 		PercError = [] 
@@ -529,10 +566,6 @@ class MachineClass(object):
 		#if(MachineClass.Queue.Size > 0):
 		currentJob = MachineClass.Queue.head.job
 		return currentJob
-		
-		#else:
-		#	GUI.writeToConsole(self.master, "nothing in queue")
-
 
 	#update data
 	def updateJob(self):
@@ -583,15 +616,14 @@ class MachineClass(object):
 
 		MachineClass.JobOrderOut.append(currentJob.name)
 		MachineClass.NumJobsInSys -= 1
-		NumJobs.append(MachineClass.NumJobsInSys)
+		NumJobs.append(MachineClass.NumJobsInSys)		# y axis of plot
+		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
 		TimeSys.append(MachineClass.CurrentTime - currentJob.arrivalTime)
 		ProcTime.append(currentJob.procTime)
 		PercError.append(abs(currentJob.percentError))
 
 		MachineClass.Queue.removeHead() # remove job from queue
 		
-
-
 	def run(self, arrRate, arrDist, procRate, procDist, percError, simLength):
 		while 1:
 			if(self.ctr == 0):	# set time of first job arrival
@@ -615,13 +647,6 @@ class MachineClass(object):
 			# If current time is greater than the simulation length, end program
 			if MachineClass.CurrentTime > simLength:
 				break
-
-
-
-
-
-	
-
 
 
 #----------------------------------------------------------------------#
