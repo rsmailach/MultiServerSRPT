@@ -404,6 +404,85 @@ class CustomDist(object):
 				self.stringList[i+1] = ""
 		print "".join(self.stringList)
 		return "".join(self.stringList)
+
+
+#----------------------------------------------------------------------#
+# Class: BoundedParetoDist
+#
+# This class is used to allow users to enter parameters to 
+# Bounded Pareto distribution.
+#
+#----------------------------------------------------------------------#
+class BoundedParetoDist(object):
+	Array = []
+	def __init__(self, master):
+		top = self.top = Toplevel(master)
+		top.geometry("500x200")                     # set window size
+		top.resizable(0,0)
+		
+		self.errorMessage = StringVar()
+
+		self.alpha = DoubleVar()
+		self.L = DoubleVar()
+		self.U = DoubleVar()
+
+		# Set default parameters
+		self.alpha.set(1.5)
+		self.L.set(10**(-2))
+		self.U.set(10**(6))
+
+		# Label frame
+		frame1 = Frame(top)
+		frame1.pack(side=TOP, padx=5, pady=5)
+		self.l=Label(frame1, text="Please enter the parameters you would like.", font=("Helvetica", 12), justify=LEFT)
+		self.l.pack()
+		self.error = Label(frame1, textvariable=self.errorMessage, fg="red", font=14)
+		self.error.pack()
+
+		# Input frame
+		frame2 = Frame(top)
+		frame2.pack(side=TOP, padx=5, pady=5)
+
+		frame2.grid_columnconfigure(0, weight=1)
+		frame2.grid_rowconfigure(0, weight=1)
+
+		self.l1 = Label(frame2, text = "alpha (shape)")
+		self.l2 = Label(frame2, text = "L (smallest job size)")
+		self.l3 = Label(frame2, text = "U (largest job size)")
+		self.l1.grid(row = 0, column = 0)
+		self.l2.grid(row = 1, column = 0)
+		self.l3.grid(row = 2, column = 0)
+
+		self.e1 = Entry(frame2, textvariable = self.alpha)
+		self.e2 = Entry(frame2, textvariable = self.L)		
+		self.e3 = Entry(frame2, textvariable = self.U)		
+		self.e1.grid(row = 0, column = 1)
+		self.e2.grid(row = 1, column = 1)
+		self.e3.grid(row = 2, column = 1)		
+
+		frame3 = Frame(top)
+		frame3.pack(side=TOP, pady=10)
+		self.b=Button(frame3,text='Ok',command=self.cleanup)
+		self.b.pack()
+
+	def cleanup(self):
+		if(self.checkParams() == 0):
+			self.paramArray=BoundedParetoDist.Array
+			self.top.destroy()
+
+	def checkParams(self):
+		self.a = float(self.e1.get())
+		self.l = float(self.e2.get())
+		self.u = float(self.e3.get())
+		if (self.a <= 0) or (self.u < self.l) or (self.l <= 0):
+			print "ERROR: Bounded pareto paramater error"
+			self.errorMessage.set("Bounded pareto paramater error")
+			return 1
+		else:
+			self.errorMessage.set("")
+			BoundedParetoDist.Array = [self.a, self.l, self.u]
+			return 0
+
 		
 #----------------------------------------------------------------------#
 # Class: Node
@@ -515,19 +594,23 @@ class JobClass(object):
 	def setBoundedPareto(self, procRate):
 		## reset lambda, to maintain load
 		## lambda/mu(pareto) = constant
-		alpha = 1.5		# Shape, power of tail, alpha = 2 is approx Expon., alpha = 1 gives higher variance
-		L = 10**(-2)	# Smallest job size
-		U = 10**6		# Largest job size
-
-		if (alpha < 0) or (U < L) or (L < 0):
-			print "ERROR: Bounded pareto paramater error"
+		#alpha = 1.5		# Shape, power of tail, alpha = 2 is approx Expon., alpha = 1 gives higher variance
+		#L = 10**(-2)	# Smallest job size
+		#U = 10**6		# Largest job size
 
 		x = random.uniform(0.0, 1.0)
+		if main.timesClicked == 0:
+			main.timesClicked += 1
+			self.popup = BoundedParetoDist(self.master)
+			self.master.wait_window(self.popup.top)		
+			alpha = float(self.popup.paramArray[0])	# Shape, power of tail, alpha = 2 is approx Expon., alpha = 1 gives higher variance
+			L = float(self.popup.paramArray[1])		# Smallest job size
+			U = float(self.popup.paramArray[2])		# Largest job size
 
-		paretoNumerator = float(-(x*U**alpha - x*L**alpha - U**alpha))
-		paretoDenominator = float(U**alpha * L**alpha)
-		main.customEquation = (paretoNumerator/paretoDenominator)**(-1/alpha)
-		return main.customEquation		
+			paretoNumerator = float(-(x*U**alpha - x*L**alpha - U**alpha))
+			paretoDenominator = float(U**alpha * L**alpha)
+			main.customEquation = (paretoNumerator/paretoDenominator)**(-1/alpha)
+		return main.customEquation
 
 	# Generates a percent error for processing time
 	def generateError(self, percError):
