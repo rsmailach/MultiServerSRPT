@@ -186,22 +186,25 @@ class Input(LabelFrame):
 	def __init__(self, master):
 		LabelFrame.__init__(self, master, text = "Input")
 		self.master = master
+		self.loadInput = DoubleVar()
 		self.arrivalRateInput = DoubleVar()
 		self.processingRateInput = DoubleVar()
 		self.percentErrorInput = DoubleVar()
 		self.simLengthInput = DoubleVar()
 		self.errorMessage = StringVar()
+		self.comboboxVal = StringVar()
 
+		self.loadInput.set(0.8)       		 	   ##################################CHANGE LATER
 		self.arrivalRateInput.set(0.8)        	   ##################################CHANGE LATER
 		self.processingRateInput.set(0.5)    	   ##################################CHANGE LATER
 		self.percentErrorInput.set(20)        	   ##################################CHANGE LATER
-		self.simLengthInput.set(500.0)            ##################################CHANGE LATER
+		self.simLengthInput.set(500.0)      	   ##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=1)
 		self.grid_rowconfigure(0, weight=1)
 
 		# Labels
-		labels = ['Interarrival Rate (' + u'\u03bb' + ')', 'Processing Rate (' + u'\u03bc' + ')', '% Error' , 'Simulation Length']
+		labels = ['System Load', 'Interarrival Rate (' + u'\u03bb' + ')', 'Processing Rate (' + u'\u03bc' + ')', '% Error' , 'Simulation Length']
 		r=0
 		c=0
 		for elem in labels:
@@ -212,28 +215,43 @@ class Input(LabelFrame):
 		Label(self, text=u"\u00B1").grid(row=2, column=1) # +/-
 
 		# Entry Boxes
+		self.entry_0 = Entry(self, textvariable = self.loadInput)
 		self.entry_1 = Entry(self, textvariable = self.arrivalRateInput)
 		self.entry_2 = Entry(self, textvariable = self.processingRateInput)
 		self.entry_3 = Entry(self, textvariable = self.percentErrorInput)
 		self.entry_4 = Entry(self, textvariable = self.simLengthInput)
-		self.entry_1.grid(row = 0, column = 2)
-		self.entry_2.grid(row = 1, column = 2)
-		self.entry_3.grid(row = 2, column = 2)
-		self.entry_4.grid(row = 3, column = 2)
+		self.entry_0.grid(row = 0, column = 2)
+		self.entry_1.grid(row = 1, column = 2)
+		self.entry_2.grid(row = 2, column = 2)
+		self.entry_3.grid(row = 3, column = 2)
+		self.entry_4.grid(row = 4, column = 2)
 
 
 		# Distribution Dropdowns
 		self.distributions = ('Select Distribution', 'Poisson', 'Exponential', 'Uniform', 'Bounded Pareto', 'Custom')
 		self.comboBox_1 = ttk.Combobox(self, values = self.distributions, state = 'disabled')
 		self.comboBox_1.current(1) # set selection
-		self.comboBox_1.grid(row = 0, column = 3)
-		self.comboBox_2 = ttk.Combobox(self, values = self.distributions, state = 'readonly')
+		self.comboBox_1.grid(row = 1, column = 3)
+		self.comboBox_2 = ttk.Combobox(self, textvariable = self.comboboxVal, values = self.distributions, state = 'readonly')
 		self.comboBox_2.current(4) # set default selection                  #####################CHANGE LATER
-		self.comboBox_2.grid(row = 1, column = 3)
+		self.comboBox_2.grid(row = 2, column = 3)
+
+		self.comboboxVal.trace("w", self.selectionChange) # refresh on change
+		self.refreshComboboxes()
 
 		# Simulate Button
 		self.simulateButton = Button(self, text = "SIMULATE", command = self.onButtonClick)
-		self.simulateButton.grid(row = 6, columnspan = 4)
+		self.simulateButton.grid(row = 7, columnspan = 4)
+
+	def selectionChange(self, name, index, mode):
+		self.refreshComboboxes()
+
+	def refreshComboboxes(self):
+		selection = self.comboBox_2.get()
+		if selection == 'Bounded Pareto':
+			self.entry_2.configure(state = 'disabled')
+		else:
+			self.entry_2.configure(state = 'normal')
 
 	def onButtonClick(self):
 		if (self.getNumericValues() == 0) and (self.getDropDownValues() == 0):
@@ -243,6 +261,7 @@ class Input(LabelFrame):
 
 	def getNumericValues(self):
 		try:
+			load = self.loadInput.get()
 			arrivalRate = self.arrivalRateInput.get()
 			processingRate = self.processingRateInput.get()
 			percentError = self.percentErrorInput.get()
@@ -250,15 +269,17 @@ class Input(LabelFrame):
 		except ValueError:
 			self.errorMessage.set("One of your inputs is an incorrect type, try again.")
 			return 1
-
+		if load <= 0.0:
+			self.errorMessage.set("System load must be a non-zero value!")
+			return 1
 		if arrivalRate <= 0.0:
-			self.errorMessage.set("Arrival rate must be non-zero value!")
+			self.errorMessage.set("Arrival rate must be a non-zero value!")
 			return 1
 		if processingRate <= 0.0:
-			self.errorMessage.set("Processing rate must be non-zero value!")
+			self.errorMessage.set("Processing rate must be a non-zero value!")
 			return 1
 		if maxSimLength <= 0.0:
-			self.errorMessage.set("Simulation length must be non-zero value!")
+			self.errorMessage.set("Simulation length must be a non-zero value!")
 			return 1
 		else:
 			self.errorMessage.set("")
@@ -269,12 +290,14 @@ class Input(LabelFrame):
 		comboBox1Value = self.comboBox_1.get()
 		comboBox2Value = self.comboBox_2.get()
 		if comboBox2Value == 'Select Distribution':
-				self.errorMessage.set("You must select a distribution for the processing rate")
-				return 1
+			self.errorMessage.set("You must select a distribution for the processing rate")
+			return 1
+		elif comboBox2Value == 'BoundedParetoDist':
+			self.entry_2.set(state = disabled)
 		else:
-				self.errorMessage.set("")
-				Input.distList = [comboBox1Value, comboBox2Value]
-				return 0
+			self.errorMessage.set("")
+			Input.distList = [comboBox1Value, comboBox2Value]
+			return 0
 
 
 #----------------------------------------------------------------------#
