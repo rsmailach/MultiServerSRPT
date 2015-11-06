@@ -14,6 +14,7 @@ from datetime import datetime
 from math import log
 import plotly.plotly as py
 from plotly.graph_objs import Scatter
+from scipy import integrate as integrate
 import copy
 import random
 import tkMessageBox
@@ -140,7 +141,8 @@ class GUI(Tk):
 
 	def displayAverageData(self):
 		self.plotNumJobsInSys()
-		AvgNumJobs = int(float(sum(NumJobs))/len(NumJobs))
+		##AvgNumJobs = int(float(sum(NumJobs))/len(NumJobs))
+		AvgNumJobs = MachineClass.AvgNumJobs
 		AvgTimeSys = float(sum(TimeSys))/len(TimeSys)
 		AvgProcTime = float(sum(ProcTime))/len(ProcTime)
 		VarProcTime = self.calcVariance(ProcTime, AvgProcTime)
@@ -691,7 +693,10 @@ class MachineClass(object):
 	TimeUntilArrival = 0.0
 	#TimeOfArrival = 0.0
 	ServiceStartTime = 0
-	NumJobsInSys = 0
+	NumJobsInSys = 0 
+	AvgNumJobs = 0
+	PrevTime = 0
+
 
 	def __init__(self, master):
 		self.master = master
@@ -702,6 +707,8 @@ class MachineClass(object):
 		MachineClass.TimeUntilArrival = 0.0
 		MachineClass.ServiceStartTime = 0
 		MachineClass.NumJobsInSys = 0
+		MachineClass.AvgNumJobs = 0
+		MachineClass.PrevTime = 0
 
 		NumJobs = []
 		NumJobsTime = []
@@ -733,17 +740,42 @@ class MachineClass(object):
 		currentJob.RPT -= serviceTime
 		currentJob.ERPT -= serviceTime
 
+	def calcNumJobs(self, jobID):
+		#GUI.writeToConsole(self.master, "Num jobs... JobID = %s"%(jobID))
+		self.t = MachineClass.CurrentTime
+		self.delta_t = self.t - MachineClass.PrevTime
+
+		if(jobID == 0):
+			# N_avg(t) = 1/t * integral(N(u))du from 0 to t
+			# MachineClass.AvgNumJobs = (1/self.t)*integrate.quad(MachineClass.NumJobsInSys, 0.0, self.t) 
+			MachineClass.AvgNumJobs = 1 # First event is always create new job
+		else:
+			# UPDATE 
+			# N_avg(t + delta_t) = t/(t + delta_t) * N_avg(t) + N(t) * delta_t 
+			#MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*MachineClass.AvgNumJobs + MachineClass.NumJobsInSys*self.delta_t 			
+			a = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs)
+			GUI.writeToConsole(self.master, "a = %s"%(a))
+			b = (MachineClass.PrevTime/(self.t))*float(MachineClass.NumJobsInSys)*self.delta_t 
+			GUI.writeToConsole(self.master, "b = %s"%(b))
+			MachineClass.AvgNumJobs = a + b
+			GUI.writeToConsole(self.master, "Num jobs = %s"%(MachineClass.AvgNumJobs))
+			GUI.writeToConsole(self.master, "Queue length = %s"%(MachineClass.Queue.Size))
+
+		# Delta_t becomes "old" t
+		MachineClass.PrevTime = self.t 
+
+
 	# Job arriving
 	def arrivalEvent(self, load, arrDist, procRate, procDist, percError):
 		J = JobClass(self.master)
 		J.setJobAttributes(load, procRate, procDist, percError, MachineClass.CurrentTime)
 		J.name = "Job%02d"%self.ctr
-		self.ctr += 1
-
-		MachineClass.NumJobsInSys += 1
-		self.saveArrivals(J)					# save to list of arrivals, for testing
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
+		MachineClass.NumJobsInSys += 1
+		self.calcNumJobs(self.ctr)
+		self.saveArrivals(J)					# save to list of arrivals, for testing
+
 		if(MachineClass.Queue.Size > 0):
 			self.updateJob()	# update data in queue
 		MachineClass.Queue.insert(J)	# add job to queue
@@ -751,6 +783,7 @@ class MachineClass(object):
 
 		# Generate next arrival
 		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, arrDist)
+		self.ctr += 1
 
 	def saveArrivals(self, job):
 		text = "%s,       %.4f,      %.4f,      %.4f"%(job.name, job.arrivalTime, job.RPT, job.ERPT) + "\n"
@@ -775,7 +808,10 @@ class MachineClass(object):
 
 		MachineClass.JobOrderOut.append(currentJob.name)
 		MachineClass.NumJobsInSys -= 1
-		NumJobs.append(MachineClass.NumJobsInSys)		# y axis of plot
+		self.calcNumJobs(self.ctr)
+		##NumJobs.append(MachineClass.NumJobsInSys)		# y axis of plot
+		NumJobs.append(MachineClass.AvgNumJobs)		# y axis of plot
+
 		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
 		TimeSys.append(MachineClass.CurrentTime - currentJob.arrivalTime)
 		ProcTime.append(currentJob.procTime)
