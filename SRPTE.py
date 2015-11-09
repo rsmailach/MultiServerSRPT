@@ -130,26 +130,26 @@ class GUI(Tk):
 	def plotNumJobsInSys(self):
 		trace0 = Scatter(x=NumJobsTime, y=NumJobs)
 		data = [trace0]
-		layout = go.Layout(
-    		title='Average Number of Jobs Over Time',
-   			xaxis=dict(
-       			title='Time',
-        		titlefont=dict(
-            	family='Courier New, monospace',
-            	size=18,
-          		color='#7f7f7f'
-        	)
-    	),
-    		yaxis=dict(
-        		title='Number of Jobs',
-        		titlefont=dict(
-         	    family='Courier New, monospace',
-        	    size=18,
-        	    color='#7f7f7f'
-        	)
-    	)
-	)
-fig = go.Figure(data=data, layout=layout)
+		#layout = py.Layout(
+    	#	title='Average Number of Jobs Over Time',
+   		#	xaxis=dict(
+       	#		title='Time',
+        #		titlefont=dict(
+        #    	family='Courier New, monospace',
+        #    	size=18,
+        #  		color='#7f7f7f'
+        #	)
+    	#),
+    	#	yaxis=dict(
+        #		title='Number of Jobs',
+        #		titlefont=dict(
+        #	    family='Courier New, monospace',
+        #	    size=18,
+        #	    color='#7f7f7f'
+        #	)
+    	#)
+		#)
+		#fig = py.Figure(data=data, layout=layout)
 		unique_url = py.plot(data, filename = 'SRPT_NumJobsInSys')
 
 
@@ -766,7 +766,7 @@ class MachineClass(object):
 		#GUI.writeToConsole(self.master, "Num jobs... JobID = %s"%(jobID))
 		MachineClass.PrevAvgJobs = MachineClass.AvgNumJobs
 		self.t = MachineClass.CurrentTime
-		self.delta_t = MachineClass.PrevTime - self.t
+		self.delta_t = self.t - MachineClass.PrevTime 
 
 		if(jobID == 0):
 			# N_avg(t) = 1/t * integral(N(u))du from 0 to t
@@ -777,12 +777,12 @@ class MachineClass(object):
 			# N_avg(t + delta_t) = t/(t + delta_t) * N_avg(t) + N(t) * delta_t 
 			# Looking in PAST
 			# N_avg(t) = (prev)/t * N_avg(prev) - (delta_t)*N(t)
-			#MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*MachineClass.AvgNumJobs + MachineClass.NumJobsInSys*self.delta_t 			
+			# MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*MachineClass.AvgNumJobs + MachineClass.NumJobsInSys*self.delta_t 			
 			a = (MachineClass.PrevTime/(self.t))*float(MachineClass.PrevAvgJobs)
 			GUI.writeToConsole(self.master, "a = %s"%(a))
 			b = float(MachineClass.NumJobsInSys)*self.delta_t 
 			GUI.writeToConsole(self.master, "b = %s"%(b))
-			MachineClass.AvgNumJobs = a + b
+			MachineClass.AvgNumJobs = a - b
 			#if(MachineClass.AvgNumJobs < 0):
 			#	MachineClass.AvgNumJobs = 0.0
 			GUI.writeToConsole(self.master, "Num jobs = %s"%(MachineClass.AvgNumJobs))
