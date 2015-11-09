@@ -759,9 +759,9 @@ class MachineClass(object):
 			GUI.writeToConsole(self.master, "a = %s"%(a))
 			b = float(MachineClass.NumJobsInSys)*self.delta_t 
 			GUI.writeToConsole(self.master, "b = %s"%(b))
-			MachineClass.AvgNumJobs = a - b
-			if(MachineClass.AvgNumJobs < 0):
-				MachineClass.AvgNumJobs = 0.0
+			MachineClass.AvgNumJobs = - a + b
+			#if(MachineClass.AvgNumJobs < 0):
+			#	MachineClass.AvgNumJobs = 0.0
 			GUI.writeToConsole(self.master, "Num jobs = %s"%(MachineClass.AvgNumJobs))
 			GUI.writeToConsole(self.master, "Queue length = %s"%(MachineClass.Queue.Size))
 
