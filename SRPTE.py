@@ -752,6 +752,8 @@ class MachineClass(object):
 		else:
 			# UPDATE 
 			# N_avg(t + delta_t) = t/(t + delta_t) * N_avg(t) + N(t) * delta_t 
+			# Looking in PAST
+			# N_avg(t) = (prev)/t * N_avg(prev) - (delta_t)*N(t)
 			#MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*MachineClass.AvgNumJobs + MachineClass.NumJobsInSys*self.delta_t 			
 			a = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs)
 			GUI.writeToConsole(self.master, "a = %s"%(a))
