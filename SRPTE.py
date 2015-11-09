@@ -14,6 +14,7 @@ from datetime import datetime
 from math import log
 import plotly.plotly as py
 from plotly.graph_objs import Scatter
+import plotly.graph_objs as go
 #from scipy import integrate as integrate
 import copy
 import random
@@ -128,29 +129,30 @@ class GUI(Tk):
 
 
 	def plotNumJobsInSys(self):
+		py.sign_in('mailacrs','wowbsbc0qo')
 		trace0 = Scatter(x=NumJobsTime, y=NumJobs)
 		data = [trace0]
-		#layout = py.Layout(
-    	#	title='Average Number of Jobs Over Time',
-   		#	xaxis=dict(
-       	#		title='Time',
-        #		titlefont=dict(
-        #    	family='Courier New, monospace',
-        #    	size=18,
-        #  		color='#7f7f7f'
-        #	)
-    	#),
-    	#	yaxis=dict(
-        #		title='Number of Jobs',
-        #		titlefont=dict(
-        #	    family='Courier New, monospace',
-        #	    size=18,
-        #	    color='#7f7f7f'
-        #	)
-    	#)
-		#)
-		#fig = py.Figure(data=data, layout=layout)
-		unique_url = py.plot(data, filename = 'SRPT_NumJobsInSys')
+		layout = go.Layout(
+    		title='Average Number of Jobs Over Time',
+   			xaxis=dict(
+       			title='Time',
+        		titlefont=dict(
+            	family='Courier New, monospace',
+            	size=18,
+          		color='#7f7f7f'
+        	)
+    	),
+    		yaxis=dict(
+        		title='Number of Jobs',
+        		titlefont=dict(
+        	    family='Courier New, monospace',
+        	    size=18,
+        	    color='#7f7f7f'
+        	)
+    	)
+		)
+		fig = go.Figure(data=data, layout=layout)
+		unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys')
 
 
 	def calcVariance(self, List, avg):
@@ -229,7 +231,7 @@ class Input(LabelFrame):
 		#self.arrivalRateInput.set(self.arrRateDefault)
 		self.processingRateInput.set(self.procRateDefault)
 		self.percentErrorInput.set(20)
-		self.simLengthInput.set(500.0)
+		self.simLengthInput.set(50.0)
 
 		self.grid_columnconfigure(0, weight=1)
 		self.grid_rowconfigure(0, weight=1)
@@ -661,19 +663,27 @@ class JobClass(object):
 		return eval(main.customEquation)
 
 	def setBoundedPareto(self):
-		x = random.uniform(0.0, 1.0)
+		# Get and set parameters (in job class array)
 		if main.timesClicked == 0:
 			main.timesClicked += 1
 			self.popup = BoundedParetoDist(self.master)
 			self.master.wait_window(self.popup.top)		
-			alpha = float(self.popup.paramArray[0])	# Shape, power of tail, alpha = 2 is approx Expon., alpha = 1 gives higher variance
-			L = float(self.popup.paramArray[1])		# Smallest job size
-			U = float(self.popup.paramArray[2])		# Largest job size
-			JobClass.BPArray = [alpha, L, U]
+			self.alpha = float(self.popup.paramArray[0])	# Shape, power of tail, alpha = 2 is approx Expon., alpha = 1 gives higher variance
+			self.L = float(self.popup.paramArray[1])		# Smallest job size
+			self.U = float(self.popup.paramArray[2])		# Largest job size
+			JobClass.BPArray = [self.alpha, self.L, self.U]
 
-			paretoNumerator = float(-(x*U**alpha - x*L**alpha - U**alpha))
-			paretoDenominator = float(U**alpha * L**alpha)
-			main.customEquation = (paretoNumerator/paretoDenominator)**(-1/alpha)
+			
+		x = random.uniform(0.0, 1.0)
+		# reassigning 
+		alpha = JobClass.BPArray[0]
+		L = JobClass.BPArray[1]
+		U = JobClass.BPArray[2]
+
+		paretoNumerator = float(-(x*(U**alpha) - x*(L**alpha) - (U**alpha)))
+		paretoDenominator = float((U**alpha) * (L**alpha))
+		main.customEquation = (paretoNumerator/paretoDenominator)**(-1/alpha)
+		
 		return main.customEquation
 
 
@@ -763,8 +773,12 @@ class MachineClass(object):
 		currentJob.ERPT -= serviceTime
 
 	def calcNumJobs(self, jobID):
-		#GUI.writeToConsole(self.master, "Num jobs... JobID = %s"%(jobID))
-		changeInJobs = MachineClass.PrevNumJobs - MachineClass.NumJobsInSys
+		if(self.serverBusy == True):
+			self.currentNumJobs = MachineClass.Queue.Size + 1
+		else:
+			self.currentNumJobs = MachineClass.Queue.Size
+
+		changeInJobs = MachineClass.PrevNumJobs - self.currentNumJobs
 		self.t = MachineClass.CurrentTime
 		self.delta_t = self.t - MachineClass.PrevTime 
 
@@ -779,19 +793,23 @@ class MachineClass(object):
 			# N_avg(t) = (prev)/t * N_avg(prev) - (delta_t)*N(t)
 			# MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*MachineClass.AvgNumJobs + MachineClass.NumJobsInSys*self.delta_t 			
 			a = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs)
-			GUI.writeToConsole(self.master, "a = %s"%(a))
 			b = float(changeInJobs)*self.delta_t 
-			GUI.writeToConsole(self.master, "b = %s"%(b))
 			MachineClass.AvgNumJobs = a - b
-			#if(MachineClass.AvgNumJobs < 0):
-			#	MachineClass.AvgNumJobs = 0.0
+			
+			if(MachineClass.AvgNumJobs < 0):
+				MachineClass.AvgNumJobs = 0.0
+			
+			#GUI.writeToConsole(self.master, "a = %s"%(a))
+			#GUI.writeToConsole(self.master, "b = %s"%(b))
+			GUI.writeToConsole(self.master, "---")
 			GUI.writeToConsole(self.master, "Num jobs = %s"%(MachineClass.AvgNumJobs))
 			GUI.writeToConsole(self.master, "Queue length = %s"%(MachineClass.Queue.Size))
+			GUI.writeToConsole(self.master, "---")
 
 		# PrevTime becomes "old" t
 		MachineClass.PrevTime = self.t 
 		# PrevNum jobs becomes current num jobs
-		MachineClass.PrevNumJobs = MachineClass.NumJobsInSys
+		MachineClass.PrevNumJobs = self.currentNumJobs
 
 
 	# Job arriving
