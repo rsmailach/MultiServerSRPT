@@ -764,7 +764,7 @@ class MachineClass(object):
 
 	def calcNumJobs(self, jobID):
 		#GUI.writeToConsole(self.master, "Num jobs... JobID = %s"%(jobID))
-		changeInJobs = MachineClass.NumJobsInSys - MachineClass.PrevNumJobs
+		changeInJobs = MachineClass.PrevNumJobs - MachineClass.NumJobsInSys
 		self.t = MachineClass.CurrentTime
 		self.delta_t = self.t - MachineClass.PrevTime 
 
