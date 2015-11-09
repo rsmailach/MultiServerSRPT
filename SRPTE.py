@@ -716,7 +716,7 @@ class MachineClass(object):
 	NumJobsInSys = 0 
 	AvgNumJobs = 0
 	PrevTime = 0
-	PrevAvgJobs = 0
+	PrevNumJobs = 0
 
 
 	def __init__(self, master):
@@ -730,7 +730,7 @@ class MachineClass(object):
 		MachineClass.NumJobsInSys = 0
 		MachineClass.AvgNumJobs = 0
 		MachineClass.PrevTime = 0
-		MachineClass.PrevAvgJobs = 0
+		MachineClass.PrevNumJobs = 0
 
 		NumJobs = []
 		NumJobsTime = []
@@ -764,7 +764,7 @@ class MachineClass(object):
 
 	def calcNumJobs(self, jobID):
 		#GUI.writeToConsole(self.master, "Num jobs... JobID = %s"%(jobID))
-		MachineClass.PrevAvgJobs = MachineClass.AvgNumJobs
+		changeInJobs = MachineClass.NumJobsInSys - MachineClass.PrevNumJobs
 		self.t = MachineClass.CurrentTime
 		self.delta_t = self.t - MachineClass.PrevTime 
 
@@ -778,9 +778,9 @@ class MachineClass(object):
 			# Looking in PAST
 			# N_avg(t) = (prev)/t * N_avg(prev) - (delta_t)*N(t)
 			# MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*MachineClass.AvgNumJobs + MachineClass.NumJobsInSys*self.delta_t 			
-			a = (MachineClass.PrevTime/(self.t))*float(MachineClass.PrevAvgJobs)
+			a = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs)
 			GUI.writeToConsole(self.master, "a = %s"%(a))
-			b = float(MachineClass.NumJobsInSys)*self.delta_t 
+			b = float(changeInJobs)*self.delta_t 
 			GUI.writeToConsole(self.master, "b = %s"%(b))
 			MachineClass.AvgNumJobs = a - b
 			#if(MachineClass.AvgNumJobs < 0):
@@ -790,6 +790,8 @@ class MachineClass(object):
 
 		# PrevTime becomes "old" t
 		MachineClass.PrevTime = self.t 
+		# PrevNum jobs becomes current num jobs
+		MachineClass.PrevNumJobs = MachineClass.NumJobsInSys
 
 
 	# Job arriving
@@ -837,7 +839,7 @@ class MachineClass(object):
 		MachineClass.NumJobsInSys -= 1
 		self.calcNumJobs(self.ctr)
 		##NumJobs.append(MachineClass.NumJobsInSys)		# y axis of plot
-		NumJobs.append(MachineClass.AvgNumJobs)		# y axis of plot
+		NumJobs.append(MachineClass.AvgNumJobs)			# y axis of plot
 
 		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
 		TimeSys.append(MachineClass.CurrentTime - currentJob.arrivalTime)
