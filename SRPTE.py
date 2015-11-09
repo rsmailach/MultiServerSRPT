@@ -14,7 +14,7 @@ from datetime import datetime
 from math import log
 import plotly.plotly as py
 from plotly.graph_objs import Scatter
-from scipy import integrate as integrate
+#from scipy import integrate as integrate
 import copy
 import random
 import tkMessageBox
@@ -755,13 +755,13 @@ class MachineClass(object):
 			#MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*MachineClass.AvgNumJobs + MachineClass.NumJobsInSys*self.delta_t 			
 			a = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs)
 			GUI.writeToConsole(self.master, "a = %s"%(a))
-			b = (MachineClass.PrevTime/(self.t))*float(MachineClass.NumJobsInSys)*self.delta_t 
+			b = float(MachineClass.NumJobsInSys)*self.delta_t 
 			GUI.writeToConsole(self.master, "b = %s"%(b))
 			MachineClass.AvgNumJobs = a + b
 			GUI.writeToConsole(self.master, "Num jobs = %s"%(MachineClass.AvgNumJobs))
 			GUI.writeToConsole(self.master, "Queue length = %s"%(MachineClass.Queue.Size))
 
-		# Delta_t becomes "old" t
+		# PrevTime becomes "old" t
 		MachineClass.PrevTime = self.t 
 
 
