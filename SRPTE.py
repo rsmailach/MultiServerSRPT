@@ -133,23 +133,23 @@ class GUI(Tk):
 		trace0 = Scatter(x=NumJobsTime, y=NumJobs)
 		data = [trace0]
 		layout = go.Layout(
-    		title='Average Number of Jobs Over Time',
-   			xaxis=dict(
-       			title='Time',
-        		titlefont=dict(
-            	family='Courier New, monospace',
-            	size=18,
-          		color='#7f7f7f'
-        	)
-    	),
-    		yaxis=dict(
-        		title='Number of Jobs',
-        		titlefont=dict(
-        	    family='Courier New, monospace',
-        	    size=18,
-        	    color='#7f7f7f'
-        	)
-    	)
+			title='Average Number of Jobs Over Time',
+			xaxis=dict(
+				title='Time',
+				titlefont=dict(
+				family='Courier New, monospace',
+				size=18,
+				color='#7f7f7f'
+			)
+		),
+			yaxis=dict(
+				title='Number of Jobs',
+				titlefont=dict(
+				family='Courier New, monospace',
+				size=18,
+				color='#7f7f7f'
+			)
+		)
 		)
 		fig = go.Figure(data=data, layout=layout)
 		unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys')
@@ -567,7 +567,7 @@ class LinkedList(object):
 	def __init__(self, head = None):
 		self.head = head
 
-    # Insert job into queue (sorted by ERPT)
+	# Insert job into queue (sorted by ERPT)
 	def insert(self, job):
 		current = self.head		# node iterator, starts at head
 		previous = None
@@ -721,33 +721,31 @@ class MachineClass(object):
 	JobOrderOut = []
 	CurrentTime = 0.0
 	TimeUntilArrival = 0.0
-	#TimeOfArrival = 0.0
 	ServiceStartTime = 0
-	NumJobsInSys = 0 
 	AvgNumJobs = 0
 	PrevTime = 0
 	PrevNumJobs = 0
+	ServerBusy = False
 
 
 	def __init__(self, master):
 		self.master = master
-		self.serverBusy = False
+		MachineClass.ServerBusy = False
 		MachineClass.Queue.clear()
 		LinkedList.Size = 0
 		MachineClass.CurrentTime = 0.0
 		MachineClass.TimeUntilArrival = 0.0
 		MachineClass.ServiceStartTime = 0
-		MachineClass.NumJobsInSys = 0
 		MachineClass.AvgNumJobs = 0
 		MachineClass.PrevTime = 0
 		MachineClass.PrevNumJobs = 0
 
-		NumJobs = []
-		NumJobsTime = []
-		TimeSys = []
-		ProcTime = []
-		PercError = [] 
-		MachineClass.JobOrderOut = []
+		NumJobs[:] = []
+		NumJobsTime[:] = []
+		TimeSys[:] = []
+		ProcTime[:] = []
+		PercError[:] = [] 
+		MachineClass.JobOrderOut[:] = []
 	
 		self.ctr = 0
 
@@ -773,7 +771,7 @@ class MachineClass(object):
 		currentJob.ERPT -= serviceTime
 
 	def calcNumJobs(self, jobID):
-		if(self.serverBusy == True):
+		if(MachineClass.ServerBusy == True):
 			self.currentNumJobs = MachineClass.Queue.Size + 1
 		else:
 			self.currentNumJobs = MachineClass.Queue.Size
@@ -782,30 +780,16 @@ class MachineClass(object):
 		self.t = MachineClass.CurrentTime
 		self.delta_t = self.t - MachineClass.PrevTime 
 
+		# If one job in system
 		if(jobID == 0):
-			# N_avg(t) = 1/t * integral(N(u))du from 0 to t
-			# MachineClass.AvgNumJobs = (1/self.t)*integrate.quad(MachineClass.NumJobsInSys, 0.0, self.t) 
 			MachineClass.AvgNumJobs = 1 # First event is always create new job
+		# UPDATE 
 		else:
-			# UPDATE 
-			# N_avg(t + delta_t) = t/(t + delta_t) * N_avg(t) + N(t) * delta_t 
-			# Looking in PAST
-			# N_avg(t) = (prev)/t * N_avg(prev) - (delta_t)*N(t)
-			# MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*MachineClass.AvgNumJobs + MachineClass.NumJobsInSys*self.delta_t 			
-			a = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs)
-			b = float(changeInJobs)*self.delta_t 
-			MachineClass.AvgNumJobs = a - b
-			
+			MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) - float(changeInJobs)*self.delta_t 
+						
 			if(MachineClass.AvgNumJobs < 0):
 				MachineClass.AvgNumJobs = 0.0
 			
-			#GUI.writeToConsole(self.master, "a = %s"%(a))
-			#GUI.writeToConsole(self.master, "b = %s"%(b))
-			GUI.writeToConsole(self.master, "---")
-			GUI.writeToConsole(self.master, "Num jobs = %s"%(MachineClass.AvgNumJobs))
-			GUI.writeToConsole(self.master, "Queue length = %s"%(MachineClass.Queue.Size))
-			GUI.writeToConsole(self.master, "---")
-
 		# PrevTime becomes "old" t
 		MachineClass.PrevTime = self.t 
 		# PrevNum jobs becomes current num jobs
@@ -819,7 +803,6 @@ class MachineClass(object):
 		J.name = "Job%02d"%self.ctr
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
-		MachineClass.NumJobsInSys += 1
 		self.calcNumJobs(self.ctr)
 		self.saveArrivals(J)					# save to list of arrivals, for testing
 
@@ -834,7 +817,7 @@ class MachineClass(object):
 
 	def saveArrivals(self, job):
 		text = "%s,       %.4f,      %.4f,      %.4f"%(job.name, job.arrivalTime, job.RPT, job.ERPT) + "\n"
-        
+		
 		with open("Arrivals.txt", "a") as myFile:
 			myFile.write(text)
 		myFile.close()
@@ -844,21 +827,18 @@ class MachineClass(object):
 		MachineClass.ServiceStartTime = MachineClass.CurrentTime
 		currentJob = self.getProcessingJob()
 		GUI.writeToConsole(self.master, "%.6f | %s processing, ERPT = %.5f"%(MachineClass.CurrentTime, currentJob.name, currentJob.ERPT))
-		self.serverBusy = True
+		MachineClass.ServerBusy = True
 
 	# Job completed
 	def completionEvent(self):
 		currentJob = self.getProcessingJob()
 		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, currentJob.name))
 
-		self.serverBusy = False
+		MachineClass.ServerBusy = False
 
 		MachineClass.JobOrderOut.append(currentJob.name)
-		MachineClass.NumJobsInSys -= 1
 		self.calcNumJobs(self.ctr)
-		##NumJobs.append(MachineClass.NumJobsInSys)		# y axis of plot
 		NumJobs.append(MachineClass.AvgNumJobs)			# y axis of plot
-
 		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
 		TimeSys.append(MachineClass.CurrentTime - currentJob.arrivalTime)
 		ProcTime.append(currentJob.procTime)
@@ -875,12 +855,12 @@ class MachineClass(object):
 				MachineClass.TimeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
 
 			# If no jobs in system, or time to arrival is less than remaining processing time of job currently processing
-			if (self.serverBusy == False) or ((self.serverBusy == True) and (MachineClass.TimeUntilArrival < self.getProcessingJob().RPT)):
+			if (MachineClass.ServerBusy == False) or ((MachineClass.ServerBusy == True) and (MachineClass.TimeUntilArrival < self.getProcessingJob().RPT)):
 				#next event is arrival
 				MachineClass.CurrentTime += MachineClass.TimeUntilArrival
 
 				# stop server from processing current job
-				self.serverBusy == False
+				MachineClass.ServerBusy == False
 				self.arrivalEvent(load, arrDist, procRate, procDist, percError)
 			else:
 				#next event is job finishing
