@@ -625,17 +625,31 @@ class LinkedList(object):
 			print "%s, class %s"%(current.job.name, current.job.priorityClass)
 			current = current.nextNode
 
-	def countClasses(self, numberOfClasses):
-		ArrayByClass = [[] for _ in range(numberOfClasses + 1)]			# create array of size number of classes
-		ArrayByClass[0].append(0)
+	def countClassesQueued(self, numberOfClasses):
+		#JobArrayByClass = [[] for _ in range(numberOfClasses + 1)]		# create array of arrays of jobs by class
+		#JobArrayByClass[0].append(None)
+		NumJobArrayByClass = [0]	* (numberOfClasses + 1)				# create array that holds number of jobs in each classes
 
 		for j in range(1, numberOfClasses + 1):
 			current = self.head
+			count = 0
 			while (current != None):
 				if current.job.priorityClass == j:
-					ArrayByClass[j].append(current)
+					#JobArrayByClass[j].append(current)
+					count += 1
 				else:
+					NumJob[j] = count
+					count = 0
 					current = current.get_next()
+		
+		##	printing for testing
+		print "Jobs per class::"
+		#print JobArrayByClass
+		print NumJobArrayByClass
+		print "----------------"
+		return NumJobArrayByClass
+
+
 
 
 		
@@ -757,16 +771,18 @@ class MachineClass(object):
 	Queue = LinkedList()
 	PreviousJobs = []
 	JobOrderOut = []
-	AvgNumJobsPerClass = []
 	CurrentTime = 0.0
 	NextArrival = 0.0
 	ServiceStartTime = 0
 	ServiceFinishTime = 0
 	ServerBusy = False
 	JobInService = None
-	AvgNumJobs = 0
+
 	PrevTime = 0
-	PrevNumJobs = 0	
+	PrevNumJobs = 0
+	AvgNumJobs = 0
+	PrevNumJobsArray = []
+	AvgNumJobsArray = []
 
 
 	def __init__(self, master):
@@ -779,10 +795,12 @@ class MachineClass(object):
 		MachineClass.ServiceFinishTime = 0
 		MachineClass.ServerBusy = False
 		MachineClass.JobInService = None
-		MachineClass.AvgNumJobs = 0
+
 		MachineClass.PrevTime = 0
 		MachineClass.PrevNumJobs = 0
-		MachineClass.AvgNumJobsPerClass[:] = []	
+		MachineClass.AvgNumJobs = 0		
+		MachineClass.PrevNumJobsArray[:] = []
+		MachineClass.AvgNumJobsArray[:] = []
 
 		NumJobs[:] = []
 		NumJobsTime[:] = []
@@ -865,17 +883,54 @@ class MachineClass(object):
 		# UPDATE 
 		else:
 			MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) - float(changeInJobs)*self.delta_t 
+			#MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) - float(MachineClass.PrevNumJobs)*self.delta_t 
 						
-			if(MachineClass.AvgNumJobs < 0):
-				MachineClass.AvgNumJobs = 0.0
+		if(MachineClass.AvgNumJobs < 0):
+			MachineClass.AvgNumJobs = 0.0
 			
 		# PrevTime becomes "old" t
 		MachineClass.PrevTime = self.t 
 		# PrevNum jobs becomes current num jobs
 		MachineClass.PrevNumJobs = self.currentNumJobs
 
-	def calcNumJobsPerClass(self):
-		for ()
+	def calcNumJobsPerClass(self, numClasses):
+		counter = 0
+		changeInJobs = []
+		changeInJobs.append(0)
+		MachineClass.PrevNumJobsArray = [0] * (numClasses + 1) 		# creates array of size (numClasses + 1) filled with 0s
+
+		self.t = MachineClass.CurrentTime
+		self.delta_t = self.t - MachineClass.PrevTime 
+		numJobsArray = list(MachineClass.Queue.countClassesQueued(numClasses))
+
+		if(MachineClass.ServerBusy == True):
+			procJob = self.getProcessingJob()
+			numJobsArray[procJob.priorityClass] += 1 
+
+		for i in range(0, numClasses + 1):
+			a = MachineClass.PrevNumJobsArray[i]
+			b = numJobsArray[i]
+			changeInJobs.append(a - b)
+
+			# If one job in system
+			if(counter == 0):
+				MachineClass.AvgNumJobsArray = list(numJobsArray)	 # First event is always create new job
+				print "hihi"
+				counter = 1
+			# UPDATE 
+			else:
+				MachineClass.AvgNumJobsArray[i] = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobsArray[i]) - float(changeInJobs[i])*self.delta_t
+				#MachineClass.AvgNumJobsArray[i] = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobsArray[i]) - float(MachineClass.PrevNumJobsArray[i])*self.delta_t 
+							
+			if(MachineClass.AvgNumJobsArray[i] < 0):
+				MachineClass.AvgNumJobsArray[i] = 0.0
+				
+		# PrevTime becomes "old" t
+		MachineClass.PrevTime = self.t 
+		# PrevNum jobs becomes current num jobs
+		MachineClass.PrevNumJobsArray = list(MachineClass.AvgNumJobsArray)
+
+
 
 	# Job arriving
 	def arrivalEvent(self, load, arrDist, procRate, procDist, numClasses, percError):
@@ -885,7 +940,7 @@ class MachineClass(object):
 		self.ctr += 1
 
 		self.calcNumJobs(self.ctr)
-		self.calcNumJobsPerClass()
+		self.calcNumJobsPerClass(numClasses)
 		self.saveArrivals(J)					# save to list of arrivals, for testing
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived"%(MachineClass.CurrentTime, J.name))
@@ -907,13 +962,13 @@ class MachineClass(object):
 		#MachineClass.Queue.removeHead() # remove job from queue
 
 	# Job completed
-	def completionEvent(self):
+	def completionEvent(self, numClasses):
 		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, MachineClass.JobInService.name))
 
 		MachineClass.JobOrderOut.append(MachineClass.JobInService.name)
 
 		self.calcNumJobs(self.ctr)
-		self.calcNumJobsPerClass()
+		self.calcNumJobsPerClass(numClasses)
 		NumJobs.append(MachineClass.AvgNumJobs)			# y axis of plot
 		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
 		TimeSys.append(MachineClass.CurrentTime - MachineClass.JobInService.arrivalTime)
@@ -949,7 +1004,7 @@ class MachineClass(object):
 			else:
 				#next event is job finishing
 				MachineClass.CurrentTime = MachineClass.ServiceFinishTime
-				self.completionEvent()
+				self.completionEvent(numClasses)
 
 				if(MachineClass.Queue.Size > 0):
 					self.processJob()

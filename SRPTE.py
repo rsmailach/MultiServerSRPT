@@ -785,10 +785,11 @@ class MachineClass(object):
 			MachineClass.AvgNumJobs = 1 # First event is always create new job
 		# UPDATE 
 		else:
-			MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) - float(changeInJobs)*self.delta_t 
+			MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) - float(changeInJobs)*self.delta_t
+			#MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) - float(MachineClass.PrevNumJobs)*self.delta_t 
 						
-			if(MachineClass.AvgNumJobs < 0):
-				MachineClass.AvgNumJobs = 0.0
+		if(MachineClass.AvgNumJobs < 0):
+			MachineClass.AvgNumJobs = 0.0
 			
 		# PrevTime becomes "old" t
 		MachineClass.PrevTime = self.t 
