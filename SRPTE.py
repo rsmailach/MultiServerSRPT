@@ -785,8 +785,8 @@ class MachineClass(object):
 			MachineClass.AvgNumJobs = 1 # First event is always create new job
 		# UPDATE 
 		else:
-			MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) - float(changeInJobs)*self.delta_t
-			#MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) - float(MachineClass.PrevNumJobs)*self.delta_t 
+			#MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) - float(changeInJobs)*self.delta_t
+			MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) - float(MachineClass.PrevNumJobs)*(float(self.delta_t)/self.t)
 						
 		if(MachineClass.AvgNumJobs < 0):
 			MachineClass.AvgNumJobs = 0.0
@@ -833,8 +833,6 @@ class MachineClass(object):
 	# Job completed
 	def completionEvent(self):
 		currentJob = self.getProcessingJob()
-		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, currentJob.name))
-
 		MachineClass.ServerBusy = False
 
 		MachineClass.JobOrderOut.append(currentJob.name)
@@ -845,7 +843,9 @@ class MachineClass(object):
 		ProcTime.append(currentJob.procTime)
 		PercError.append(abs(currentJob.percentError))
 
+		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, currentJob.name))
 		MachineClass.Queue.removeHead() # remove job from queue
+
 
 
 
