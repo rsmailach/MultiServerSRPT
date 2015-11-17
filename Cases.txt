@@ -1,0 +1,27 @@
+VARIABLES:
+1. Arrival/Load(lambda) = 0.8 -- FIXED LOAD
+	- since load is fixed (lambda/mu), lambda often needs to change to maintain that load as mu is changing
+	- constant = lambda/(mu * (L, u, alpha))
+2. # of Classes = 10 (for ApproxSRPTE) -- FIXED
+	FUTURE: how well does each extra class perform?
+3. Processing distribution
+	- Bounded Pareto (L, u, alpha) 
+	- L = smallest job size
+	- u = largest job size
+	- alpha = power of tail 
+		alpha = 2 is approx Exponential
+		use alpha = 1 for higher variance
+4. % Error
+	- Try 0, 5, 10, 20, ...
+-------------------------------------------------------------------------
+L = 1
+U = 10^6, 10^8
+alpha = 1.1, 1.5, 1.9
+
+SIM LENGTH = 1000*U
+
+CASE 1: 
+	load = 0.8
+	alpha = 1.1
+	U = 10^6
+	Sim Length = 100000 = 10^5

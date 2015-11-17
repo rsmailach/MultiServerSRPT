@@ -899,10 +899,7 @@ class MachineClass(object):
 			MachineClass.AvgNumJobs = 1 # First event is always create new job
 		# UPDATE 
 		else:
-			MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) - float(MachineClass.PrevNumJobs)*(float(self.delta_t)/self.t)
-						
-		if(MachineClass.AvgNumJobs < 0):
-			MachineClass.AvgNumJobs = 0.0
+			MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) + float(MachineClass.PrevNumJobs)*(float(self.delta_t)/self.t)
 			
 		# PrevTime becomes "old" t
 		MachineClass.PrevTime = self.t 
@@ -924,11 +921,8 @@ class MachineClass(object):
 				MachineClass.counter = 1
 			# UPDATE 
 			else:
-				MachineClass.AvgNumJobsArray[i] = (float(MachineClass.PrevTimeA)/self.t)*float(MachineClass.AvgNumJobsArray[i]) - float(MachineClass.PrevNumJobsArray[i])*(float(self.delta_t)/self.t)
-							
-			if(MachineClass.AvgNumJobsArray[i] < 0):
-				MachineClass.AvgNumJobsArray[i] = 0.0
-			
+				MachineClass.AvgNumJobsArray[i] = (float(MachineClass.PrevTimeA)/self.t)*float(MachineClass.AvgNumJobsArray[i]) + float(MachineClass.PrevNumJobsArray[i])*(float(self.delta_t)/self.t)
+									
 		# PrevTime becomes "old" t (set in regular caclulation)
 		MachineClass.PrevTimeA = self.t 
 		# PrevNum jobs becomes current num jobs
