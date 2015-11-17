@@ -867,6 +867,7 @@ class MachineClass(object):
 				#next event is job finishing
 				MachineClass.CurrentTime += self.getProcessingJob().RPT
 				self.completionEvent()
+
 				if(MachineClass.Queue.Size > 0):
 					self.processJob()
 

@@ -136,7 +136,7 @@ class GUI(Tk):
 		self.writeToConsole("Number of Classes = %d"%numClasses)
 		self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
 
-	def plotNumJobsInSys(self):
+	def plotNumJobsInSys(self, numClasses):
 		py.sign_in('mailacrs','wowbsbc0qo')
 		trace0 = Scatter(x=NumJobsTime, y=NumJobs)
 		data = [trace0]
@@ -160,7 +160,37 @@ class GUI(Tk):
 		)
 		)
 		fig = go.Figure(data=data, layout=layout)
-		unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys')		
+		unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys')
+
+		#-----------------------------------------------------------------------------#
+		# Average jobs/class
+		print "avg num jobs class"
+		print MachineClass.AvgNumJobsArray
+		trace1 = go.Bar(y= MachineClass.AvgNumJobsArray)
+		
+		data1 = [trace1]
+		layout1 = go.Layout(
+			title='Average Number of Jobs Per Class',
+			xaxis=dict(
+				title='Classes',
+				range=[1,numClasses],              # set range
+				titlefont=dict(
+				family='Courier New, monospace',
+				size=18,
+				color='#7f7f7f'
+			)
+		),
+			yaxis=dict(
+				title='Number of Jobs',
+				titlefont=dict(
+				family='Courier New, monospace',
+				size=18,
+				color='#7f7f7f'
+			)
+		)
+		)
+		fig1 = go.Figure(data=data1, layout=layout1)
+		unique_url1 = py.plot(fig1, filename = 'SRPT_NumJobsInSysPerClass')
 
 	def calcVariance(self, List, avg):
 		var = 0
@@ -168,7 +198,8 @@ class GUI(Tk):
 			var += (avg - i)**2
 		return var/len(List)
 
-	def displayAverageData(self):
+	def displayAverageData(self, numClasses):
+		self.plotNumJobsInSys(numClasses)
 		try:
 			AvgNumJobs = int(float(sum(NumJobs))/len(NumJobs))
 		except ZeroDivisionError:
@@ -202,7 +233,6 @@ class GUI(Tk):
 		#self.writeToConsole('Request order: %s' % ArrivalClass.JobOrderIn)
 		self.writeToConsole('Service order: %s\n\n' % MachineClass.JobOrderOut)
 
-
 				
 	def submit(self, event):
 		self.updateStatusBar("Simulating...")
@@ -227,7 +257,7 @@ class GUI(Tk):
 				I.valuesList[3],				# num class
 				I.valuesList[4])				# sim time
 
-		self.displayAverageData()
+		self.displayAverageData(I.valuesList[3])
 		self.updateStatusBar("Simulation complete.")
 
 
@@ -506,7 +536,7 @@ class BoundedParetoDist(object):
 
 		# Set default parameters
 		self.alpha.set(1.5)
-		self.L.set(10**(-2))
+		self.L.set(1)
 		self.U.set(10**(6))
 
 		# Label frame
@@ -637,26 +667,12 @@ class LinkedList(object):
 
 		for j in range(1, numberOfClasses + 1):
 			current = self.head
-			count = 0
 			while (current != None):
 				if current.job.priorityClass == j:
-					#JobArrayByClass[j].append(current)
-					count += 1
-				else:
-					NumJob[j] = count
-					count = 0
-					current = current.get_next()
+					LinkedList.NumJobArrayByClass[j] += 1
+				current = current.nextNode
 		
-		##	printing for testing
-		print "Jobs per class::" + str(LinkedList.NumJobArrayByClass) + "----------------"
 		return LinkedList.NumJobArrayByClass
-
-
-
-
-		
-
-
 
 
 #----------------------------------------------------------------------#
@@ -843,7 +859,7 @@ class MachineClass(object):
 		currentJob.ERPT -= serviceTime
 
 	def saveArrivals(self, job):
-		text = "%s,       %.4f,      %.4f,      %.4f,      %s"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.priorityClass) + "\n"
+		text = "%s,       %.4f,      %.4f,      %.4f"%(job.name, job.arrivalTime, job.RPT, job.ERPT) + "\n"
 		
 		with open("Arrivals.txt", "a") as myFile:
 			myFile.write(text)
@@ -874,13 +890,7 @@ class MachineClass(object):
 		#MachineClass.Queue.printList() # print what is left in queue
 
 	def calcNumJobs(self, jobID):
-		GUI.writeToConsole(self.master, "Queue Size: %s"%(MachineClass.Queue.Size))
-		#if(MachineClass.ServerBusy == True):
-		#	self.currentNumJobs = MachineClass.Queue.Size + 1
-		#else:
 		self.currentNumJobs = MachineClass.Queue.Size
-
-		#changeInJobs = MachineClass.PrevNumJobs - self.currentNumJobs
 		self.t = MachineClass.CurrentTime
 		self.delta_t = self.t - MachineClass.PrevTime 
 
@@ -898,6 +908,7 @@ class MachineClass(object):
 		MachineClass.PrevTime = self.t 
 		# PrevNum jobs becomes current num jobs
 		MachineClass.PrevNumJobs = self.currentNumJobs
+
 
 	def calcNumJobsPerClass(self, numClasses):
 		numJobsArray = list(MachineClass.Queue.countClassesQueued(numClasses)) ### BUG SOMEHOW
@@ -918,7 +929,6 @@ class MachineClass(object):
 			if(MachineClass.AvgNumJobsArray[i] < 0):
 				MachineClass.AvgNumJobsArray[i] = 0.0
 			
-
 		# PrevTime becomes "old" t (set in regular caclulation)
 		MachineClass.PrevTimeA = self.t 
 		# PrevNum jobs becomes current num jobs
@@ -935,10 +945,10 @@ class MachineClass(object):
 		self.calcNumJobsPerClass(numClasses)
 		self.saveArrivals(J)					# save to list of arrivals, for testing
 
-		GUI.writeToConsole(self.master, "%.6f | %s arrived"%(MachineClass.CurrentTime, J.name))
 		if(MachineClass.Queue.Size > 0):
 			self.updateJob()	# update data in queue	
 		self.assignClass(numClasses, J)			# give job a class, and add to queue
+		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass))
 		self.processJob()						# process first job in queue
 
 		MachineClass.NextArrival = MachineClass.CurrentTime + self.setArrivalDist(J.arrivalRate, arrDist) # generate next arrival
@@ -959,17 +969,17 @@ class MachineClass(object):
 
 		self.calcNumJobs(self.ctr)
 		self.calcNumJobsPerClass(numClasses)
-		NumJobs.append(MachineClass.AvgNumJobs)			# y axis of plot
-		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
+		NumJobs.append(MachineClass.AvgNumJobs)				# y axis of plot
+		NumJobsTime.append(MachineClass.CurrentTime)		# x axis of plot
 		TimeSys.append(MachineClass.CurrentTime - MachineClass.JobInService.arrivalTime)
 		ProcTime.append(MachineClass.JobInService.procTime)
 		PercError.append(abs(MachineClass.JobInService.percentError))
 
+		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, MachineClass.JobInService.name))
 		MachineClass.ServerBusy = False
 		MachineClass.JobInService = None
-
-		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, MachineClass.JobInService.name))
-		MachineClass.Queue.removeHead() # remove job from queue
+		
+		MachineClass.Queue.removeHead()		 # remove job from queue
 		#MachineClass.Queue.printList() 	# print what is left in queue
 		
 
@@ -988,9 +998,7 @@ class MachineClass(object):
 
 				# stop server from processing current job
 				MachineClass.ServerBusy == False
-
 				self.arrivalEvent(load, arrDist, procRate, procDist, numClasses, percError)
-
 			else:
 				#next event is job finishing
 				MachineClass.CurrentTime = MachineClass.ServiceFinishTime
