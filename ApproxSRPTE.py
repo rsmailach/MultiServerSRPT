@@ -160,7 +160,7 @@ class GUI(Tk):
 		)
 		)
 		fig = go.Figure(data=data, layout=layout)
-		unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys')
+		unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys: Case1')
 
 		#-----------------------------------------------------------------------------#
 		# Average jobs/class
@@ -190,7 +190,7 @@ class GUI(Tk):
 		)
 		)
 		fig1 = go.Figure(data=data1, layout=layout1)
-		unique_url1 = py.plot(fig1, filename = 'SRPT_NumJobsInSysPerClass')
+		unique_url1 = py.plot(fig1, filename = 'SRPT_NumJobsInSysPerClass: Case1')
 
 	def calcVariance(self, List, avg):
 		var = 0
@@ -707,7 +707,7 @@ class JobClass(object):
 				self.processRate = 1/float(procMean)
 		else:
 			self.processRate = procRate
-		self.arrivalRate = float(load) / self.processRate
+		self.arrivalRate = float(load) * self.processRate
 
 	# Dictionary of service distributions
 	def setServiceDist(self, procRate, procDist):

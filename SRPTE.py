@@ -636,7 +636,7 @@ class JobClass(object):
 				self.processRate = 1/float(procMean)
 		else:
 			self.processRate = procRate
-		self.arrivalRate = float(load) / self.processRate
+		self.arrivalRate = float(load) * self.processRate
 
 	# Dictionary of service distributions
 	def setServiceDist(self, procRate, procDist):

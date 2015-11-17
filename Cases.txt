@@ -24,4 +24,16 @@ CASE 1:
 	load = 0.8
 	alpha = 1.1
 	U = 10^6
-	Sim Length = 100000 = 10^5
+	Sim Length = 200000 = 20^4
+
+CASE 2: 
+	load = 0.8
+	alpha = 1.5
+	U = 10^6
+	Sim Length = 200000 = 20^4
+
+CASE 3: 
+	load = 0.8
+	alpha = 1.9
+	U = 10^6
+	Sim Length = 200000 = 20^4
