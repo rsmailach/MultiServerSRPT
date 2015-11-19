@@ -240,7 +240,7 @@ class GUI(Tk):
 		I = Input(self)     
 
 		self.printParams(I.valuesList[0],					#load
-						 I.distList[0],						#arrivalDist
+						 'Exponential',						#arrival
 						 I.valuesList[1], I.distList[1], 	#processing rate
 						 I.valuesList[2],					#error 
 						 I.valuesList[3], 					#num Classes
@@ -251,7 +251,7 @@ class GUI(Tk):
 		# Start process
 		MC = MachineClass(self)
 		MC.run(	I.valuesList[0],				#load
-				I.distList[0],					#arrival dist
+				'Exponential',					#arrival
 				I.valuesList[1], I.distList[1],	# proc
 				I.valuesList[2],				# error
 				I.valuesList[3],				# num class
@@ -286,7 +286,7 @@ class Input(LabelFrame):
 		self.processingRateInput.set(0.5)       ##################################CHANGE LATER
 		self.percentErrorInput.set(20)          ##################################CHANGE LATER
 		self.numberOfClassesInput.set(8)		##################################CHANGE LATER
-		self.simLengthInput.set(50.0)           ##################################CHANGE LATER
+		self.simLengthInput.set(10000.0)           ##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=1)
 		self.grid_rowconfigure(0, weight=1)
@@ -322,7 +322,7 @@ class Input(LabelFrame):
 		# Distribution Dropdowns
 		self.distributions = ('Select Distribution', 'Poisson', 'Exponential', 'Uniform', 'Bounded Pareto', 'Custom')
 		self.comboBox_1 = ttk.Combobox(self, values = self.distributions, state = 'disabled')
-		self.comboBox_1.current(1) # set selection
+		self.comboBox_1.current(2) # set selection
 		self.comboBox_1.grid(row = 1, column = 3)
 		self.comboBox_2 = ttk.Combobox(self, textvariable = self.comboboxVal, values = self.distributions, state = 'readonly')
 		self.comboBox_2.current(4) # set default selection                  #####################CHANGE LATER
@@ -535,7 +535,7 @@ class BoundedParetoDist(object):
 		self.U = DoubleVar()
 
 		# Set default parameters
-		self.alpha.set(1.5)
+		self.alpha.set(1.1)
 		self.L.set(1)
 		self.U.set(10**(6))
 
@@ -947,6 +947,17 @@ class MachineClass(object):
 
 		MachineClass.NextArrival = MachineClass.CurrentTime + self.setArrivalDist(J.arrivalRate, arrDist) # generate next arrival
 
+	# Inserts very large job with very small ERPT
+	def insertLargeJob(self, procDist):
+		J = JobClass(self.master)
+		J.setJobAttributes(1, 1, procDist, 1, MachineClass.CurrentTime)
+		J.name = "JobXXXXX"
+		J.RPT = 10000
+		J.ERPT = 1
+		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
+		
+		MachineClass.Queue.insert(J)	# add job to queue
+
 	# Processing first job in queue
 	def processJob(self):
 		MachineClass.ServiceStartTime = MachineClass.CurrentTime
@@ -979,6 +990,7 @@ class MachineClass(object):
 
 
 	def run(self, load, arrDist, procRate, procDist, percError, numClasses, simLength):
+		has_run = False
 		while 1:
 			# Generate time of first job arrival
 			if(self.ctr == 0):
@@ -986,7 +998,11 @@ class MachineClass(object):
 				MachineClass.NextArrival = MachineClass.CurrentTime + self.setArrivalDist(arrRate, arrDist)
 
 			# If no jobs in system, or time to arrival is less than remaining processing time of job currently processing
-			if (MachineClass.ServerBusy == False) or ((MachineClass.ServerBusy == True) and (MachineClass.NextArrival < MachineClass.ServiceFinishTime)):
+			if (MachineClass.CurrentTime >= 5000 and has_run == False):
+				self.insertLargeJob(procDist)
+				has_run = True
+
+			elif (MachineClass.ServerBusy == False) or ((MachineClass.ServerBusy == True) and (MachineClass.NextArrival < MachineClass.ServiceFinishTime)):
 				#next event is arrival
 				MachineClass.CurrentTime = MachineClass.NextArrival
 
