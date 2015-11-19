@@ -65,23 +65,22 @@ class GUI(Tk):
 		status.pack(side=BOTTOM, anchor=W, fill=X)      
 
 		# Initialize console
+		self.consoleFrame = Frame(self.frameOut)
+		self.console = Text(self.consoleFrame, wrap = WORD)		
 		self.makeConsole()
 		self.printIntro()
 		self.updateStatusBar("Waiting for submit...")
 
 	def makeConsole(self):
-		consoleFrame = Frame(self.frameOut)
-		consoleFrame.pack(side=TOP, expand=True, fill=BOTH, padx=5, pady=5)
-
-		self.console = Text(consoleFrame, wrap = WORD)
-		scrollbar = Scrollbar(consoleFrame)
-
+		#self.consoleFrame = Frame(self.frameOut)
+		self.consoleFrame.pack(side=TOP, padx=5, pady=5)
+		#self.console = Text(self.consoleFrame, wrap = WORD)
 		self.console.config(state=DISABLED)     # start with console as disabled (non-editable)
-		scrollbar.config(command = self.console.yview)
-		self.console.config(yscrollcommand=scrollbar.set)
-
-		self.console.grid(column=0, row=0, sticky='NSEW')
-		scrollbar.grid(column=1, row=0, sticky='NS')
+		self.scrollbar = Scrollbar(self.consoleFrame)
+		self.scrollbar.config(command = self.console.yview)
+		self.console.config(yscrollcommand=self.scrollbar.set)
+		self.console.grid(column=0, row=0)
+		self.scrollbar.grid(column=1, row=0, sticky='NS')
 
 		#DOES NOTHING??
 		self.grid_columnconfigure(0, weight=1) 
@@ -92,6 +91,7 @@ class GUI(Tk):
 		self.console.config(state=NORMAL)       # make console editable
 		self.console.insert(END, '%s\n'%text)
 		self.update()
+		self.console.yview(END)					# auto-scroll		
 		self.console.config(state=DISABLED)     # disable (non-editable) console
 
 	def saveData(self, event):
