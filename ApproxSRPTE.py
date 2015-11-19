@@ -948,15 +948,16 @@ class MachineClass(object):
 		MachineClass.NextArrival = MachineClass.CurrentTime + self.setArrivalDist(J.arrivalRate, arrDist) # generate next arrival
 
 	# Inserts very large job with very small ERPT
-	def insertLargeJob(self, procDist):
+	def insertLargeJob(self, procDist, numClasses):
 		J = JobClass(self.master)
 		J.setJobAttributes(1, 1, procDist, 1, MachineClass.CurrentTime)
 		J.name = "JobXXXXX"
 		J.RPT = 10000
 		J.ERPT = 1
+		self.assignClass(numClasses, J)			# give job a class, and add to queue
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
 		
-		MachineClass.Queue.insert(J)	# add job to queue
+
 
 	# Processing first job in queue
 	def processJob(self):
@@ -999,7 +1000,7 @@ class MachineClass(object):
 
 			# If no jobs in system, or time to arrival is less than remaining processing time of job currently processing
 			if (MachineClass.CurrentTime >= 5000 and has_run == False):
-				self.insertLargeJob(procDist)
+				self.insertLargeJob(procDist, numClasses)
 				has_run = True
 
 			elif (MachineClass.ServerBusy == False) or ((MachineClass.ServerBusy == True) and (MachineClass.NextArrival < MachineClass.ServiceFinishTime)):
