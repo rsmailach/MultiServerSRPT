@@ -60,6 +60,9 @@ class GUI(Tk):
 		# Bind clear button
 		self.bind("<<output_clear>>", self.clearConsole)
 
+		# Bind stop button
+		self.bind("<<stop_sim>>", self.stopSimulation)		
+
 		# Status Bar
 		status = Label(self.master, textvariable=self.statusText, bd=1, relief=SUNKEN, anchor=W)
 		status.pack(side=BOTTOM, anchor=W, fill=X)      
@@ -233,6 +236,8 @@ class GUI(Tk):
 		#self.writeToConsole('Request order: %s' % ArrivalClass.JobOrderIn)
 		self.writeToConsole('Service order: %s\n\n' % MachineClass.JobOrderOut)
 
+	def stopSimulation(self, event):
+		MachineClass.StopSim = True
 				
 	def submit(self, event):
 		self.updateStatusBar("Simulating...")
@@ -434,6 +439,10 @@ class Output(LabelFrame):
 		self.saveButton = Button(buttonFrame, text = "SAVE DATA", command = self.onSaveButtonClick)
 		self.saveButton.grid(row=2, column=1)
 
+		# Stop Button
+		self.stopButton = Button(buttonFrame, text = "STOP SIMULATION", command = self.onStopButtonClick)
+		self.stopButton.grid(row = 2, column = 2)		
+
 	def onClearButtonClick(self):
 		# Clear console
 		self.clearButton.event_generate("<<output_clear>>")
@@ -442,6 +451,9 @@ class Output(LabelFrame):
 		# Save data
 		self.saveButton.event_generate("<<output_save>>")
 
+	def onStopButtonClick(self):
+		# Stop simulation
+		self.stopButton.event_generate("<<stop_sim>>")
 
 #----------------------------------------------------------------------#
 # Class: CustomDist
@@ -795,6 +807,7 @@ class MachineClass(object):
 	ServiceFinishTime = 0
 	ServerBusy = False
 	JobInService = None
+	StopSim = False	
 
 	PrevTime = 0
 	PrevTimeA = 0
@@ -815,6 +828,8 @@ class MachineClass(object):
 		MachineClass.ServiceFinishTime = 0
 		MachineClass.ServerBusy = False
 		MachineClass.JobInService = None
+		MachineClass.StopSim = False
+
 
 		MachineClass.PrevTime = 0
 		MachineClass.PrevTimeA = 0
@@ -1019,7 +1034,7 @@ class MachineClass(object):
 					self.processJob()
 
 			# If current time is greater than the simulation length, end program
-			if MachineClass.CurrentTime > simLength:
+			if (MachineClass.CurrentTime > simLength) or (MachineClass.StopSim == True):
 				break
 
 

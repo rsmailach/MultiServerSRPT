@@ -60,6 +60,9 @@ class GUI(Tk):
 		# Bind clear button
 		self.bind("<<output_clear>>", self.clearConsole)
 
+		# Bind stop button
+		self.bind("<<stop_sim>>", self.stopSimulation)		
+
 		# Status Bar
 		status = Label(self.master, textvariable=self.statusText, bd=1, relief=SUNKEN, anchor=W)
 		status.pack(side=BOTTOM, anchor=W, fill=X)      
@@ -130,7 +133,6 @@ class GUI(Tk):
 		self.writeToConsole("% Error  = " + u"\u00B1" + " %.4f"%percError)
 		self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
 
-
 	def plotNumJobsInSys(self):
 		py.sign_in('mailacrs','wowbsbc0qo')
 		trace0 = Scatter(x=NumJobsTime, y=NumJobs)
@@ -181,6 +183,8 @@ class GUI(Tk):
 		#self.writeToConsole('Request order: %s' % ArrivalClass.JobOrderIn)
 		self.writeToConsole('Service order: %s\n\n' % MachineClass.JobOrderOut)
 
+	def stopSimulation(self, event):
+		MachineClass.StopSim = True
 
 	def submit(self, event):
 		self.updateStatusBar("Simulating...")
@@ -388,6 +392,10 @@ class Output(LabelFrame):
 		self.saveButton = Button(buttonFrame, text = "SAVE DATA", command = self.onSaveButtonClick)
 		self.saveButton.grid(row=2, column=1)
 
+		# Stop Button
+		self.stopButton = Button(buttonFrame, text = "STOP SIMULATION", command = self.onStopButtonClick)
+		self.stopButton.grid(row = 2, column = 2)
+
 	def onClearButtonClick(self):
 		# Clear console
 		self.clearButton.event_generate("<<output_clear>>")
@@ -396,6 +404,9 @@ class Output(LabelFrame):
 		# Save data
 		self.saveButton.event_generate("<<output_save>>")
 
+	def onStopButtonClick(self):
+		# Stop simulation
+		self.stopButton.event_generate("<<stop_sim>>")
 
 #----------------------------------------------------------------------#
 # Class: CustomDist
@@ -729,11 +740,12 @@ class MachineClass(object):
 	PrevTime = 0
 	PrevNumJobs = 0
 	ServerBusy = False
-
+	StopSim = False
 
 	def __init__(self, master):
 		self.master = master
 		MachineClass.ServerBusy = False
+		MachineClass.StopSim = False
 		MachineClass.Queue.clear()
 		LinkedList.Size = 0
 		MachineClass.CurrentTime = 0.0
@@ -795,6 +807,10 @@ class MachineClass(object):
 		# PrevNum jobs becomes current num jobs
 		MachineClass.PrevNumJobs = self.currentNumJobs
 
+		NumJobs.append(MachineClass.AvgNumJobs)			# y axis of plot
+		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
+
+
 
 	# Job arriving
 	def arrivalEvent(self, load, arrDist, procRate, procDist, percError):
@@ -823,7 +839,16 @@ class MachineClass(object):
 		J.ERPT = 1
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
 		
+		self.calcNumJobs(self.ctr)
+		self.saveArrivals(J)					# save to list of arrivals, for testing
+
+		if(MachineClass.Queue.Size > 0):
+			self.updateJob()	# update data in queue
 		MachineClass.Queue.insert(J)	# add job to queue
+		self.processJob()	# process first job in queue
+
+		# Generate next arrival
+		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, 'Exponential')
 
 	def saveArrivals(self, job):
 		text = "%s,       %.4f,      %.4f,      %.4f"%(job.name, job.arrivalTime, job.RPT, job.ERPT) + "\n"
@@ -846,8 +871,8 @@ class MachineClass(object):
 
 		MachineClass.JobOrderOut.append(currentJob.name)
 		self.calcNumJobs(self.ctr)
-		NumJobs.append(MachineClass.AvgNumJobs)			# y axis of plot
-		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
+#		NumJobs.append(MachineClass.AvgNumJobs)			# y axis of plot
+#		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
 		TimeSys.append(MachineClass.CurrentTime - currentJob.arrivalTime)
 		ProcTime.append(currentJob.procTime)
 		PercError.append(abs(currentJob.percentError))
@@ -886,7 +911,7 @@ class MachineClass(object):
 					self.processJob()
 
 			# If current time is greater than the simulation length, end program
-			if MachineClass.CurrentTime > simLength:
+			if (MachineClass.CurrentTime > simLength) or (MachineClass.StopSim == True):
 				break
 
 
