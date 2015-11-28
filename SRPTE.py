@@ -238,7 +238,7 @@ class Input(LabelFrame):
 		#self.arrivalRateInput.set(self.arrRateDefault)
 		self.processingRateInput.set(self.procRateDefault)
 		self.percentErrorInput.set(20)
-		self.simLengthInput.set(10000.0)
+		self.simLengthInput.set(100000.0)
 
 		self.grid_columnconfigure(0, weight=1)
 		self.grid_rowconfigure(0, weight=1)
@@ -891,11 +891,11 @@ class MachineClass(object):
 				MachineClass.TimeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
 
 			# If no jobs in system, or time to arrival is less than remaining processing time of job currently processing
-			if (MachineClass.CurrentTime >= 5000 and has_run == False):
-				self.insertLargeJob(procDist)
-				has_run = True
+			#if (MachineClass.CurrentTime >= 5000 and has_run == False):
+			#	self.insertLargeJob(procDist)
+			#	has_run = True
 
-			elif (MachineClass.ServerBusy == False) or ((MachineClass.ServerBusy == True) and (MachineClass.TimeUntilArrival < self.getProcessingJob().RPT)):
+			if (MachineClass.ServerBusy == False) or ((MachineClass.ServerBusy == True) and (MachineClass.TimeUntilArrival < self.getProcessingJob().RPT)):
 				#next event is arrival
 				MachineClass.CurrentTime += MachineClass.TimeUntilArrival
 
