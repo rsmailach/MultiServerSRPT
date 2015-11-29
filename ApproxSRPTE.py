@@ -176,7 +176,7 @@ class GUI(Tk):
 			title='Average Number of Jobs Per Class',
 			xaxis=dict(
 				title='Classes',
-				range=[1,numClasses],              # set range
+				range=[1,numClasses.numClasses],              # set range
 				titlefont=dict(
 				family='Courier New, monospace',
 				size=18,
@@ -631,6 +631,7 @@ class LinkedList(object):
 		self.head = head
 		LinkedList.NumJobArrayByClass[:] = []
 		LinkedList.Count = 0
+		LinkedList.Size = 0
 
 	# Insert job into queue (sorted by class, then name)
 	def insert(self, job):
@@ -657,7 +658,7 @@ class LinkedList(object):
 			self.head = self.head.nextNode		# move head forward one node
 			LinkedList.Size -= 1
 		else:
-			GUI.writeToConsole(self.master, "ERROR: The linked list is already empty!")
+			print "ERROR: The linked list is already empty!"
 
 	def clear(self):
 		LinkedList.Size = 0
@@ -800,7 +801,6 @@ class JobClass(object):
 #----------------------------------------------------------------------#
 class MachineClass(object):
 	Queue = LinkedList()
-	LastClassQueue = LinkedList()
 	PreviousJobs = []
 	LastClassPrevJobs = []
 	JobOrderOut = []
@@ -824,7 +824,6 @@ class MachineClass(object):
 	def __init__(self, master):
 		self.master = master
 		MachineClass.Queue.clear()
-		MachineClass.LastClassQueue.clear()
 		MachineClass.PreviousJobs[:] = []
 		MachineClass.LastClassPrevJobs[:] = []
 		MachineClass.CurrentTime = 0.0
@@ -864,17 +863,8 @@ class MachineClass(object):
 		return ArrivalDistributions[arrDist]
 	
 	def getProcessingJob(self):
-		#if(MachineClass.Queue.Size > 0 and MachineClass.Queue.head != MachineClass.LastClassQueue.head):
-		if(MachineClass.Queue.head):
-			#print "queue head" + str(MachineClass.Queue.head.job.name)
-			currentJob = MachineClass.Queue.head.job
-		elif(MachineClass.LastClassQueue):
-			#print "class head" + str(MachineClass.LastClassQueue.head.job.name)
-			currentJob = MachineClass.LastClassQueue.head.job
+		currentJob = MachineClass.Queue.head.job
 		return currentJob
-		
-		#else:
-		#	GUI.writeToConsole(self.master, "nothing in queue")
 
 	#update data
 	def updateJob(self):
@@ -891,7 +881,7 @@ class MachineClass(object):
 		myFile.close()
 
 	# Give arriving job a class and add it to the queue
-	def assignClass(self, numClasses, job, linkedList, prevJobs, counterStart, counter):
+	def assignClass(self, numClasses, job, prevJobs, counterStart, counter):
 		# Remove oldest job from previous jobs list if there are too many
 		while len(prevJobs) > (numClasses - 1):
 			prevJobs.pop(0)
@@ -910,16 +900,12 @@ class MachineClass(object):
 
 		# if job is in the last class, resort into subclass
 		if (job.priorityClass == numClasses):
-			self.assignClass(numClasses, job, MachineClass.LastClassQueue, MachineClass.LastClassPrevJobs, numClasses, 0.1)
+			self.assignClass(numClasses, job, MachineClass.LastClassPrevJobs, numClasses, 0.1)
 
 		# Add current job with new class to queue
-		linkedList.insert(job)			# add job to queue
-		prevJobs.append(job)	# add job to previous jobs queue
+		MachineClass.Queue.insert(job)			# add job to queue
+		MachineClass.Queue.append(job)	# add job to previous jobs queue
 
-
-		print "queue size " + str(MachineClass.Queue.Size)
-		print "class size " + str(MachineClass.LastClassQueue.Size)
-		print "\n--------------\n"
 
 	def calcNumJobs(self, jobID):
 		self.currentNumJobs = MachineClass.Queue.Size
@@ -973,7 +959,7 @@ class MachineClass(object):
 
 		if(MachineClass.Queue.Size > 0):
 			self.updateJob()	# update data in queue	
-		self.assignClass(numClasses, J, MachineClass.Queue, MachineClass.PreviousJobs, 0, 1)			# give job a class, and add to queue
+		self.assignClass(numClasses, J, MachineClass.PreviousJobs, 0, 1)			# give job a class, and add to queue
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass))
 		self.processJob()						# process first job in queue
 
@@ -1024,11 +1010,7 @@ class MachineClass(object):
 		MachineClass.ServerBusy = False
 		MachineClass.JobInService = None
 		
-		# If current processing job is from the last class remove it from that linked list
-		if(self.getProcessingJob().priorityClass > numClasses):
-			MachineClass.LastClassQueue.removeHead()
-		else:
-			MachineClass.Queue.removeHead()		 # remove job from queue		
+		MachineClass.Queue.removeHead()		 # remove job from queue		
 
 
 	def run(self, load, arrDist, procRate, procDist, percError, numClasses, simLength):
