@@ -671,6 +671,7 @@ class LinkedList(object):
 			print "%s, class %s"%(current.job.name, current.job.priorityClass)
 			current = current.nextNode
 
+
 	def countClassesQueued(self, numberOfClasses):
 		#JobArrayByClass = [[] for _ in range(numberOfClasses + 1)]		# create array of arrays of jobs by class
 		#JobArrayByClass[0].append(None)
@@ -863,8 +864,13 @@ class MachineClass(object):
 		return ArrivalDistributions[arrDist]
 	
 	def getProcessingJob(self):
-		#if(MachineClass.Queue.Size > 0):
-		currentJob = MachineClass.Queue.head.job
+		#if(MachineClass.Queue.Size > 0 and MachineClass.Queue.head != MachineClass.LastClassQueue.head):
+		if(MachineClass.Queue.head):
+			#print "queue head" + str(MachineClass.Queue.head.job.name)
+			currentJob = MachineClass.Queue.head.job
+		elif(MachineClass.LastClassQueue):
+			#print "class head" + str(MachineClass.LastClassQueue.head.job.name)
+			currentJob = MachineClass.LastClassQueue.head.job
 		return currentJob
 		
 		#else:
@@ -896,7 +902,6 @@ class MachineClass(object):
 		self.SortedPrevJobs.append(job)							# append current job (not a copy)
 		self.SortedPrevJobs.sort(key=lambda JobClass: JobClass.ERPT)
 
-
 		iterator = counter
 		for j in self.SortedPrevJobs:
 			if j.name == job.name:
@@ -905,16 +910,16 @@ class MachineClass(object):
 
 		# if job is in the last class, resort into subclass
 		if (job.priorityClass == numClasses):
-			print "job assigned to largest job class"
 			self.assignClass(numClasses, job, MachineClass.LastClassQueue, MachineClass.LastClassPrevJobs, numClasses, 0.1)
 
 		# Add current job with new class to queue
 		linkedList.insert(job)			# add job to queue
 		prevJobs.append(job)	# add job to previous jobs queue
 
-		MachineClass.Queue.printList() # print what is left in queue
+
+		print "queue size " + str(MachineClass.Queue.Size)
+		print "class size " + str(MachineClass.LastClassQueue.Size)
 		print "\n--------------\n"
-		MachineClass.LastClassQueue.printList() # print what is left in queue
 
 	def calcNumJobs(self, jobID):
 		self.currentNumJobs = MachineClass.Queue.Size
@@ -973,28 +978,27 @@ class MachineClass(object):
 		self.processJob()						# process first job in queue
 
 		MachineClass.NextArrival = MachineClass.CurrentTime + self.setArrivalDist(J.arrivalRate, arrDist) # generate next arrival
+		
 
 	# Inserts very large job with very small ERPT
-	def insertLargeJob(self, procDist, numClasses):
-		J = JobClass(self.master)
-		J.setJobAttributes(1, 1, procDist, 1, MachineClass.CurrentTime)
-		J.name = "JobXXXXX"
-		J.RPT = 10000
-		J.ERPT = 1
-		self.assignClass(numClasses, J)			# give job a class, and add to queue
-		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
-		
-		self.calcNumJobs(self.ctr)
-		self.saveArrivals(J)					# save to list of arrivals, for testing
-
-		if(MachineClass.Queue.Size > 0):
-			self.updateJob()	# update data in queue
-		self.processJob()	# process first job in queue
-
-		# Generate next arrival
-		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, 'Exponential')		
-		
-
+	#def insertLargeJob(self, procDist, numClasses):
+	#	J = JobClass(self.master)
+	#	J.setJobAttributes(1, 1, procDist, 1, MachineClass.CurrentTime)
+	#	J.name = "JobXXXXX"
+	#	J.RPT = 10000
+	#	J.ERPT = 1
+	#	self.assignClass(numClasses, J)			# give job a class, and add to queue
+	#	GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
+	#	
+	#	self.calcNumJobs(self.ctr)
+	#	self.saveArrivals(J)					# save to list of arrivals, for testing
+	#
+	#	if(MachineClass.Queue.Size > 0):
+	#		self.updateJob()	# update data in queue
+	#	self.processJob()	# process first job in queue
+	#
+	#	# Generate next arrival
+	#	MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, 'Exponential')		
 
 	# Processing first job in queue
 	def processJob(self):
@@ -1003,8 +1007,6 @@ class MachineClass(object):
 		MachineClass.ServiceFinishTime = MachineClass.CurrentTime + MachineClass.JobInService.RPT
 		GUI.writeToConsole(self.master, "%.6f | %s processing, class = %s"%(MachineClass.CurrentTime, MachineClass.JobInService.name, MachineClass.JobInService.priorityClass))
 		MachineClass.ServerBusy = True
-
-		#MachineClass.Queue.removeHead() # remove job from queue
 
 	# Job completed
 	def completionEvent(self, numClasses):
@@ -1022,9 +1024,11 @@ class MachineClass(object):
 		MachineClass.ServerBusy = False
 		MachineClass.JobInService = None
 		
-		MachineClass.Queue.removeHead()		 # remove job from queue
-		#MachineClass.Queue.printList() 	# print what is left in queue
-		
+		# If current processing job is from the last class remove it from that linked list
+		if(self.getProcessingJob().priorityClass > numClasses):
+			MachineClass.LastClassQueue.removeHead()
+		else:
+			MachineClass.Queue.removeHead()		 # remove job from queue		
 
 
 	def run(self, load, arrDist, procRate, procDist, percError, numClasses, simLength):
