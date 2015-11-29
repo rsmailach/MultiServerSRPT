@@ -167,8 +167,6 @@ class GUI(Tk):
 
 		#-----------------------------------------------------------------------------#
 		# Average jobs/class
-		print "avg num jobs class"
-		print MachineClass.AvgNumJobsArray
 		trace1 = go.Bar(y= MachineClass.AvgNumJobsArray)
 		
 		data1 = [trace1]
@@ -176,7 +174,7 @@ class GUI(Tk):
 			title='Average Number of Jobs Per Class',
 			xaxis=dict(
 				title='Classes',
-				range=[1,numClasses.numClasses],              # set range
+				range=[1,numClasses],              # set range
 				titlefont=dict(
 				family='Courier New, monospace',
 				size=18,
@@ -673,19 +671,19 @@ class LinkedList(object):
 			current = current.nextNode
 
 
-	def countClassesQueued(self, numberOfClasses):
-		#JobArrayByClass = [[] for _ in range(numberOfClasses + 1)]		# create array of arrays of jobs by class
-		#JobArrayByClass[0].append(None)
+	def countClassesQueued(self, numClasses):
 		if(LinkedList.Count == 0):
-			LinkedList.NumJobArrayByClass = [0] * (numberOfClasses + 1)	# create array that holds number of jobs in each classes
+			LinkedList.NumJobArrayByClass = [0] * (numClasses + 1)	# create array that holds number of jobs in each classes
 
-		for j in range(1, numberOfClasses + 1):
+		# Iterate through number of classes and count number of jobs per class
+		for j in range(1, numClasses + 1):
 			current = self.head
 			while (current != None):
 				if current.job.priorityClass == j:
 					LinkedList.NumJobArrayByClass[j] += 1
+				elif current.job.priorityClass > numClasses:
+					LinkedList.NumJobArrayByClass[numClasses] += 1
 				current = current.nextNode
-		
 		return LinkedList.NumJobArrayByClass
 
 
@@ -904,7 +902,7 @@ class MachineClass(object):
 
 		# Add current job with new class to queue
 		MachineClass.Queue.insert(job)			# add job to queue
-		MachineClass.Queue.append(job)	# add job to previous jobs queue
+		prevJobs.append(job)					# add job to previous jobs queue
 
 
 	def calcNumJobs(self, jobID):
@@ -926,7 +924,7 @@ class MachineClass(object):
 
 
 	def calcNumJobsPerClass(self, numClasses):
-		numJobsArray = list(MachineClass.Queue.countClassesQueued(numClasses)) ### BUG SOMEHOW
+		numJobsArray = list(MachineClass.Queue.countClassesQueued(numClasses))
 
 		self.t = MachineClass.CurrentTime 
 		self.delta_t = self.t - MachineClass.PrevTimeA
@@ -935,7 +933,7 @@ class MachineClass(object):
 			# If one job in system
 			if(MachineClass.counter == 0):
 				MachineClass.PrevNumJobsArray = [0] * (numClasses + 1) 		# creates array of size (numClasses + 1) filled with 0s
-				MachineClass.AvgNumJobsArray = list(numJobsArray)			 # First event is always create new job
+				MachineClass.AvgNumJobsArray = list(numJobsArray)			# First event is always create new job
 				MachineClass.counter = 1
 			# UPDATE 
 			else:
