@@ -872,7 +872,7 @@ class MachineClass(object):
 		currentJob.ERPT -= serviceTime
 
 	def saveArrivals(self, job):
-		text = "%s,       %.4f,      %.4f,      %.4f"%(job.name, job.arrivalTime, job.RPT, job.ERPT) + "\n"
+		text = "%s,       %.4f,      %.4f,      %.4f,      %.4f"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.priorityClass) + "\n"
 		
 		with open("Arrivals.txt", "a") as myFile:
 			myFile.write(text)
@@ -896,13 +896,22 @@ class MachineClass(object):
 				job.priorityClass = counterStart + counter
 			counter += iterator
 
-		# if job is in the last class, resort into subclass
+		# If job is in the last class, resort into subclass
 		if (job.priorityClass == numClasses):
 			self.assignClass(numClasses, job, MachineClass.LastClassPrevJobs, numClasses, 0.1)
+		else:
+			# If job has been assigned to last class
+			if (job.priorityClass > numClasses):		
+				MachineClass.LastClassPrevJobs.append(job)					# add job to previous jobs queue
+			
+			# Regardless of class, append job to the general prev jobs list
+			MachineClass.PreviousJobs.append(job)					# add job to previous jobs queue
+		
 
-		# Add current job with new class to queue
-		MachineClass.Queue.insert(job)			# add job to queue
-		prevJobs.append(job)					# add job to previous jobs queue
+		#print prev jobs array
+		#print "\n\nPrevJobs Array"
+		#for job in self.SortedPrevJobs:
+		#	print job.name + "," + str(job.ERPT) + "," + str(job.priorityClass)
 
 
 	def calcNumJobs(self, jobID):
@@ -953,11 +962,19 @@ class MachineClass(object):
 
 		self.calcNumJobs(self.ctr)
 		self.calcNumJobsPerClass(numClasses)
-		self.saveArrivals(J)					# save to list of arrivals, for testing
 
 		if(MachineClass.Queue.Size > 0):
 			self.updateJob()	# update data in queue	
 		self.assignClass(numClasses, J, MachineClass.PreviousJobs, 0, 1)			# give job a class, and add to queue
+		self.saveArrivals(J)					# save to list of arrivals, for testing
+
+
+		# Add current job with new class to queue
+		MachineClass.Queue.insert(J)			# add job to queue
+		GUI.writeToConsole(self.master, "Adding %s to queue"%J.name)
+
+
+
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass))
 		self.processJob()						# process first job in queue
 
