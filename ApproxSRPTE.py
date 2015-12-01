@@ -872,7 +872,7 @@ class MachineClass(object):
 		currentJob.ERPT -= serviceTime
 
 	def saveArrivals(self, job):
-		text = "%s,       %.4f,      %.4f,      %.4f,      %.4f"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.priorityClass) + "\n"
+		text = "%s,       %.4f,      %.4f,      %.4f,      %s"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.priorityClass) + "\n"
 		
 		with open("Arrivals.txt", "a") as myFile:
 			myFile.write(text)
@@ -968,13 +968,8 @@ class MachineClass(object):
 		self.assignClass(numClasses, J, MachineClass.PreviousJobs, 0, 1)			# give job a class, and add to queue
 		self.saveArrivals(J)					# save to list of arrivals, for testing
 
-
 		# Add current job with new class to queue
 		MachineClass.Queue.insert(J)			# add job to queue
-		GUI.writeToConsole(self.master, "Adding %s to queue"%J.name)
-
-
-
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass))
 		self.processJob()						# process first job in queue
 
