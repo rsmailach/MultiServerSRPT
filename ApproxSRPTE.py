@@ -632,7 +632,7 @@ class LinkedList(object):
 		LinkedList.Size = 0
 
 	# Insert job into queue (sorted by class, then name)
-	def insert(self, job):
+	def insertByClass(self, job):
 		current = self.head		# node iterator, starts at head
 		previous = None
 		if (current == None):	# if queue is empty, set current job as head
@@ -650,6 +650,24 @@ class LinkedList(object):
 
 		LinkedList.Size += 1
 
+	def insertByERPT(self, job, numClasses):
+		current = self.head		# node iterator, starts at head
+		previous = None
+		if (current == None):	# if queue is empty, set current job as head
+			self.head = Node(job, None)
+		else:
+			while (current != None) and (job.priorityClass == numClasses) and (job.ERPT > current.job.ERPT):
+				previous = current 				# prev = node[i]
+				current = current.nextNode 		# current = node[i+1]
+			
+			# Insert new node after previous before current
+			if (previous == None):
+				self.head = Node(job, current)
+			else:
+				previous.nextNode = Node(job, current)
+
+		LinkedList.Size += 1		
+
 	# Remove first item in queue
 	def removeHead(self):
 		if (LinkedList.Size > 0):
@@ -664,10 +682,10 @@ class LinkedList(object):
 
 	def printList(self):
 		current = self.head
+		print "---------------------"
 		print "\nJOBS IN QUEUE:"
-		#print "%.4f----------------"%(MachineClass.CurrentTime)
 		while (current != None):
-			print "%s, class %s"%(current.job.name, current.job.priorityClass)
+			print "%s, class %s, ERPT = %.4f"%(current.job.name, current.job.priorityClass, current.job.ERPT)
 			current = current.nextNode
 
 
@@ -896,22 +914,30 @@ class MachineClass(object):
 				job.priorityClass = counterStart + counter
 			counter += iterator
 
-		# If job is in the last class, resort into subclass
+		# If job is in the last class, sort by ERPT
 		if (job.priorityClass == numClasses):
-			self.assignClass(numClasses, job, MachineClass.LastClassPrevJobs, numClasses, 0.1)
+			#self.assignClass(numClasses, job, MachineClass.LastClassPrevJobs, numClasses, 0.1)
+			MachineClass.Queue.insertByERPT(job, numClasses);
+
 		else:
-			# If job has been assigned to last class
-			if (job.priorityClass > numClasses):		
-				MachineClass.LastClassPrevJobs.append(job)					# add job to previous jobs queue
+			# Add current job with new class to queue
+			MachineClass.Queue.insertByClass(job)			# add job to queue
 			
-			# Regardless of class, append job to the general prev jobs list
-			MachineClass.PreviousJobs.append(job)					# add job to previous jobs queue
+			# If job has been assigned to last class
+			#if (job.priorityClass > numClasses):		
+			#	MachineClass.LastClassPrevJobs.append(job)					# add job to previous jobs queue
+			
+		
+		# Regardless of class, append job to the general prev jobs list
+		MachineClass.PreviousJobs.append(job)					# add job to previous jobs queue
 		
 
 		#print prev jobs array
 		#print "\n\nPrevJobs Array"
 		#for job in self.SortedPrevJobs:
 		#	print job.name + "," + str(job.ERPT) + "," + str(job.priorityClass)
+		MachineClass.Queue.printList()
+		
 
 
 	def calcNumJobs(self, jobID):
@@ -968,8 +994,6 @@ class MachineClass(object):
 		self.assignClass(numClasses, J, MachineClass.PreviousJobs, 0, 1)			# give job a class, and add to queue
 		self.saveArrivals(J)					# save to list of arrivals, for testing
 
-		# Add current job with new class to queue
-		MachineClass.Queue.insert(J)			# add job to queue
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass))
 		self.processJob()						# process first job in queue
 
