@@ -666,6 +666,24 @@ class LinkedList(object):
 			else:
 				previous.nextNode = Node(job, current)
 
+		LinkedList.Size += 1	
+
+	def insertByLCFS(self, job, numClasses):
+		current = self.head		# node iterator, starts at head
+		previous = None
+		if (current == None):	# if queue is empty, set current job as head
+			self.head = Node(job, None)
+		else:
+			while (current != None) and (job.priorityClass == numClasses) and (job.arrivalTime < current.job.arrivalTime):
+				previous = current 				# prev = node[i]
+				current = current.nextNode 		# current = node[i+1]
+			
+			# Insert new node after previous before current
+			if (previous == None):
+				self.head = Node(job, current)
+			else:
+				previous.nextNode = Node(job, current)
+
 		LinkedList.Size += 1		
 
 	# Remove first item in queue
@@ -916,26 +934,20 @@ class MachineClass(object):
 
 		# If job is in the last class, sort by ERPT
 		if (job.priorityClass == numClasses):
-			#self.assignClass(numClasses, job, MachineClass.LastClassPrevJobs, numClasses, 0.1)
-			MachineClass.Queue.insertByERPT(job, numClasses);
+			#MachineClass.Queue.insertByERPT(job, numClasses);
+			MachineClass.Queue.insertByLCFS(job, numClasses);
 
 		else:
 			# Add current job with new class to queue
 			MachineClass.Queue.insertByClass(job)			# add job to queue
-			
-			# If job has been assigned to last class
-			#if (job.priorityClass > numClasses):		
-			#	MachineClass.LastClassPrevJobs.append(job)					# add job to previous jobs queue
-			
 		
 		# Regardless of class, append job to the general prev jobs list
 		MachineClass.PreviousJobs.append(job)					# add job to previous jobs queue
-		
 
 		#print prev jobs array
 		#print "\n\nPrevJobs Array"
 		#for job in self.SortedPrevJobs:
-		#	print job.name + "," + str(job.ERPT) + "," + str(job.priorityClass)
+	#		print job.name + "," + str(job.arrivalTime) + "," + str(job.priorityClass)
 		MachineClass.Queue.printList()
 		
 
