@@ -123,14 +123,14 @@ class GUI(Tk):
 	def printIntro(self):
 		self.writeToConsole("SRPTE \n\n This application simulates a single server with Poisson arrivals and processing times of a general distribution. Each arrival has an estimation error within a percent error taken as input. Jobs are serviced in order of shortest remaining processing time.")
 
-	def printParams(self, load, arrDist, procRate, procDist, percError, simLength): 
+	def printParams(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, simLength): 
 		self.writeToConsole("--------------------------------------------------------------------------------")
 		self.writeToConsole("PARAMETERS:")
 		self.writeToConsole("Load = %.4f"%load)
 		#self.writeToConsole("Arrival Rate = %.4f"%arrRate)
 		self.writeToConsole("Arrival Distribution = %s"%arrDist)
 		self.writeToConsole("Processing Rate = %.4f, Processing Distribution = %s"%(procRate, str(procDist)))
-		self.writeToConsole("% Error  = " + u"\u00B1" + " %.4f"%percError)
+		self.writeToConsole("% Error  = " + u"\u00B1" + " %.4f, %.4f"%(percErrorMin, percErrorMax))
 		self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
 
 	def plotNumJobsInSys(self):
@@ -194,8 +194,9 @@ class GUI(Tk):
 		self.printParams(I.valuesList[0], 					#load
 						 'Exponential',						#arrival
 						 I.valuesList[1], I.distList[1],	#processing rate
-						 I.valuesList[2], 					#error
-						 I.valuesList[3])					#sim time
+						 I.valuesList[2], 					#error min
+						 I.valuesList[3],					#error max 
+						 I.valuesList[4])					#sim time
 
 		main.timesClicked = 0
 		
@@ -204,8 +205,9 @@ class GUI(Tk):
 		MC.run(	I.valuesList[0],				# load 
 				'Exponential',					# arrival
 				I.valuesList[1], I.distList[1],	# processing
-				I.valuesList[2], 				# error
-				I.valuesList[3])				# sim time
+				I.valuesList[2], 				# error min
+				I.valuesList[3],				# error max
+				I.valuesList[4])				# sim time
 
 		self.displayAverageData()
 		self.updateStatusBar("Simulation complete.")
@@ -225,7 +227,8 @@ class Input(LabelFrame):
 		self.loadInput = DoubleVar()
 		self.arrivalRateInput = DoubleVar()
 		self.processingRateInput = DoubleVar()
-		self.percentErrorInput = DoubleVar()
+		self.percentErrorMinInput = DoubleVar()
+		self.percentErrorMaxInput = DoubleVar()
 		self.simLengthInput = DoubleVar()
 		self.errorMessage = StringVar()
 		self.comboboxVal = StringVar()
@@ -237,10 +240,16 @@ class Input(LabelFrame):
 		self.loadInput.set(self.loadDefault)
 		#self.arrivalRateInput.set(self.arrRateDefault)
 		self.processingRateInput.set(self.procRateDefault)
-		self.percentErrorInput.set(20)
+		self.percentErrorMinInput.set(-20)
+		self.percentErrorMaxInput.set(20)
 		self.simLengthInput.set(100000.0)
 
-		self.grid_columnconfigure(0, weight=1)
+		self.grid_columnconfigure(0, weight=2)
+		self.grid_columnconfigure(1, weight=2)
+		self.grid_columnconfigure(2, weight=1)
+		self.grid_columnconfigure(3, weight=1)
+		self.grid_columnconfigure(4, weight=1)
+		self.grid_columnconfigure(5, weight=2)
 		self.grid_rowconfigure(0, weight=1)
 
 		# Labels
@@ -252,46 +261,44 @@ class Input(LabelFrame):
 			r=r+1
 		
 		Label(self, textvariable=self.errorMessage, fg="red", font=14).grid(row=6, columnspan=4) #error message, invalid input
-		Label(self, text=u"\u00B1").grid(row=3, column=1) # +/-
+		#Label(self, text=u"\u00B1").grid(row=3, column=1) # +/-
+		Label(self, text="Min").grid(row=3, column=1, sticky = E) 
+		Label(self, text="Max").grid(row=3, column=3, sticky = W) 
 
 		# Entry Boxes
 		self.entry_0 = Entry(self, textvariable = self.loadInput)
 		self.entry_1 = Entry(self, textvariable = self.arrivalRateInput)
 		self.entry_2 = Entry(self, textvariable = self.processingRateInput)
-		self.entry_3 = Entry(self, textvariable = self.percentErrorInput)
+		self.entry_3a = Entry(self, textvariable = self.percentErrorMinInput, width = 5)
+		self.entry_3b = Entry(self, textvariable = self.percentErrorMaxInput, width = 5)
 		self.entry_4 = Entry(self, textvariable = self.simLengthInput)
-		self.entry_0.grid(row = 0, column = 2)
-		self.entry_1.grid(row = 1, column = 2)
-		self.entry_2.grid(row = 2, column = 2)
-		self.entry_3.grid(row = 3, column = 2)
-		self.entry_4.grid(row = 4, column = 2)
+		self.entry_0.grid(row = 0, column = 1)
+		self.entry_1.grid(row = 1, column = 1)
+		self.entry_2.grid(row = 2, column = 1)
+		self.entry_3a.grid(row = 3, column = 2, sticky = E)
+		self.entry_3b.grid(row = 3, column = 4, sticky = W)
+		self.entry_4.grid(row = 4, column = 1)
 		
 
 		# Disable interarrival time
 		self.entry_1.delete(0, 'end')
 		self.entry_1.configure(state = 'disabled')
 
-		# Swaps between load and interrarival rate based on input
-		#self.loadInput.trace('w', self.entryBoxChange)
-		#self.arrivalRateInput.trace('w', self.entryBoxChange)
-		#self.refreshLoad()
-
-
 		# Distribution Dropdowns
 		self.distributions = ('Select Distribution', 'Poisson', 'Exponential', 'Uniform', 'Bounded Pareto', 'Custom')
 		self.comboBox_1 = ttk.Combobox(self, values = self.distributions, state = 'disabled')
 		self.comboBox_1.current(2) # set selection
-		self.comboBox_1.grid(row = 1, column = 3)
+		self.comboBox_1.grid(row = 1, column = 5)
 		self.comboBox_2 = ttk.Combobox(self, textvariable = self.comboboxVal, values = self.distributions, state = 'readonly')
 		self.comboBox_2.current(4) # set default selection                  #####################CHANGE LATER
-		self.comboBox_2.grid(row = 2, column = 3)
+		self.comboBox_2.grid(row = 2, column = 5)
 
 		self.comboboxVal.trace("w", self.selectionChange) # refresh on change
 		self.refreshComboboxes()
 
 		# Simulate Button
 		self.simulateButton = Button(self, text = "SIMULATE", command = self.onButtonClick)
-		self.simulateButton.grid(row = 7, columnspan = 4)
+		self.simulateButton.grid(row = 7, columnspan = 6)
 
 	def entryBoxChange(self, name, index, mode):
 		self.refreshLoad()
@@ -333,7 +340,8 @@ class Input(LabelFrame):
 			load = self.loadInput.get()
 			#arrivalRate = self.arrivalRateInput.get()
 			processingRate = self.processingRateInput.get()
-			percentError = self.percentErrorInput.get()
+			percentErrorMin = self.percentErrorMinInput.get()
+			percentErrorMax = self.percentErrorMaxInput.get()
 			maxSimLength = self.simLengthInput.get()
 		except ValueError:
 				self.errorMessage.set("One of your inputs is an incorrect type, try again.")
@@ -353,7 +361,7 @@ class Input(LabelFrame):
 			return 1
 		else:
 			self.errorMessage.set("")
-			Input.valuesList = [load, processingRate, percentError, maxSimLength]
+			Input.valuesList = [load, processingRate, percentErrorMin, percentErrorMax, maxSimLength]
 			return 0
 
 	def getDropDownValues(self):
@@ -702,19 +710,19 @@ class JobClass(object):
 
 
 	# Generates a percent error for processing time
-	def generateError(self, percError):
-		self.percentError = pow(-1, random.randint(0,1)) * (percError * random.random())
+	def generateError(self, percErrorMin, percErrorMax):
+		self.percentError = random.randint(percErrorMin, percErrorMax)
 		return self.percentError
 
 	# Sets all processing times for job
-	def setJobAttributes(self, load, procRate, procDist, percError, jobArrival):
+	def setJobAttributes(self, load, procRate, procDist, percErrorMin, percErrorMax, jobArrival):
 		if(procDist == 'Bounded Pareto'):
 			self.procTime = self.setServiceDist(procRate, procDist) 		#use updated proc rate
 			self.setArrProcRates(load, procRate, procDist)
 		else:
 			self.setArrProcRates(load, procRate, procDist)
 			self.procTime = self.setServiceDist(procRate, procDist) 		#use updated proc rate
-		self.estimatedProcTime = (1 + (self.generateError(percError)/100.0))*self.procTime
+		self.estimatedProcTime = (1 + (self.generateError(percErrorMin, percErrorMax)/100.0))*self.procTime
 		self.RPT = self.procTime
 		self.ERPT = self.estimatedProcTime
 		self.arrivalTime = jobArrival
@@ -813,9 +821,9 @@ class MachineClass(object):
 
 
 	# Job arriving
-	def arrivalEvent(self, load, arrDist, procRate, procDist, percError):
+	def arrivalEvent(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax):
 		J = JobClass(self.master)
-		J.setJobAttributes(load, procRate, procDist, percError, MachineClass.CurrentTime)
+		J.setJobAttributes(load, procRate, procDist, percErrorMin, percErrorMax, MachineClass.CurrentTime)
 		J.name = "Job%02d"%self.ctr
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
@@ -883,7 +891,7 @@ class MachineClass(object):
 
 
 
-	def run(self, load, arrDist, procRate, procDist, percError, simLength):
+	def run(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, simLength):
 		has_run = False
 		while 1:
 			if(self.ctr == 0):	# set time of first job arrival
@@ -901,7 +909,7 @@ class MachineClass(object):
 
 				# stop server from processing current job
 				MachineClass.ServerBusy == False
-				self.arrivalEvent(load, arrDist, procRate, procDist, percError)
+				self.arrivalEvent(load, arrDist, procRate, procDist, percErrorMin, percErrorMax)
 			else:
 				#next event is job finishing
 				MachineClass.CurrentTime += self.getProcessingJob().RPT
