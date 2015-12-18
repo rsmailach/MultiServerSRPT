@@ -297,7 +297,7 @@ class Input(LabelFrame):
 		self.simLengthInput.set(100000.0)           ##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=2)
-		self.grid_columnconfigure(1, weight=3)
+		self.grid_columnconfigure(1, weight=2)
 		self.grid_columnconfigure(2, weight=1)
 		self.grid_columnconfigure(3, weight=1)
 		self.grid_columnconfigure(4, weight=1)
@@ -670,7 +670,7 @@ class LinkedList(object):
 		if (current == None):	# if queue is empty, set current job as head
 			self.head = Node(job, None)
 		else:
-			while (current != None) and (job.priorityClass == numClasses) and (job.ERPT > current.job.ERPT):
+			while (current != None) and (job.priorityClass >= current.job.priorityClass) and (job.ERPT > current.job.ERPT):
 				previous = current 				# prev = node[i]
 				current = current.nextNode 		# current = node[i+1]
 			
@@ -688,7 +688,7 @@ class LinkedList(object):
 		if (current == None):	# if queue is empty, set current job as head
 			self.head = Node(job, None)
 		else:
-			while (current != None) and (job.priorityClass == numClasses) and (job.arrivalTime < current.job.arrivalTime):
+			while (current != None) and (job.priorityClass >= current.job.priorityClass) and (job.arrivalTime < current.job.arrivalTime):
 				previous = current 				# prev = node[i]
 				current = current.nextNode 		# current = node[i+1]
 			
