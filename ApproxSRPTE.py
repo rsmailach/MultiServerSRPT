@@ -688,11 +688,11 @@ class LinkedList(object):
 		if (current == None):	# if queue is empty, set current job as head
 			self.head = Node(job, None)
 		else:
-			while (current != None) and (job.priorityClass >= current.job.priorityClass) and (job.arrivalTime < current.job.arrivalTime):
+			while (current != None) and (current.job.priorityClass != numClasses):			# insert at front of last class
 				previous = current 				# prev = node[i]
 				current = current.nextNode 		# current = node[i+1]
 			
-			# Insert new node after previous before current
+			# Insert new node after previous (before current)
 			if (previous == None):
 				self.head = Node(job, current)
 			else:
