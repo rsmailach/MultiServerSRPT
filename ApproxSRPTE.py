@@ -264,6 +264,7 @@ class GUI(Tk):
 				I.valuesList[5])				# sim time
 
 		self.displayAverageData(I.valuesList[4])
+		self.saveData()
 		self.updateStatusBar("Simulation complete.")
 
 
