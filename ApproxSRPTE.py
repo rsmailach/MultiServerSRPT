@@ -114,7 +114,6 @@ class GUI(Tk):
 	# Empty arrivals file at the begining of each simulation
 	def clearSavedArrivals(self):
 		with open("Arrivals.txt", "w") as myFile:
-			myFile.write("random seed = %s"%self.seed)
 			myFile.write('JOB NAME,    ARRIVAL TIME,    RPT,     ERPT,     CLASS' + '\n')
 		myFile.close()
 
@@ -233,7 +232,7 @@ class GUI(Tk):
 		self.writeToConsole('Variance of processing time: %.6f' %VarProcTime)
 		self.writeToConsole('Average percent error: %.2f\n' %AvgPercError)
 		#self.writeToConsole('Request order: %s' % ArrivalClass.JobOrderIn)
-		self.writeToConsole('Service order: %s\n\n' % MachineClass.JobOrderOut)
+		#self.writeToConsole('Service order: %s\n\n' % MachineClass.JobOrderOut)
 
 	def stopSimulation(self, event):
 		MachineClass.StopSim = True
@@ -264,7 +263,7 @@ class GUI(Tk):
 				I.valuesList[5])				# sim time
 
 		self.displayAverageData(I.valuesList[4])
-		self.saveData()
+		#self.saveData()
 		self.updateStatusBar("Simulation complete.")
 
 
@@ -289,13 +288,13 @@ class Input(LabelFrame):
 		self.errorMessage = StringVar()
 		self.comboboxVal = StringVar()
 
-		self.loadInput.set(0.8)       		 	   ##################################CHANGE LATER
-		#self.arrivalRateInput.set(1.0)          ##################################CHANGE LATER
-		self.processingRateInput.set(0.5)       ##################################CHANGE LATER
+		self.loadInput.set(0.7)       		 	   	##################################CHANGE LATER
+		#self.arrivalRateInput.set(1.0)         	 ##################################CHANGE LATER
+		self.processingRateInput.set(0.5)   	    ##################################CHANGE LATER
 		self.percentErrorMinInput.set(-20)          ##################################CHANGE LATER
 		self.percentErrorMaxInput.set(20)          ##################################CHANGE LATER
-		self.numberOfClassesInput.set(8)		##################################CHANGE LATER
-		self.simLengthInput.set(100000.0)           ##################################CHANGE LATER
+		self.numberOfClassesInput.set(10)			##################################CHANGE LATER
+		self.simLengthInput.set(10000000.0)           ##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=2)
 		self.grid_columnconfigure(1, weight=2)
@@ -959,11 +958,8 @@ class MachineClass(object):
 		# Regardless of class, append job to the general prev jobs list
 		MachineClass.PreviousJobs.append(job)					# add job to previous jobs queue
 
-		#print prev jobs array
-		#print "\n\nPrevJobs Array"
-		#for job in self.SortedPrevJobs:
-	#		print job.name + "," + str(job.arrivalTime) + "," + str(job.priorityClass)
-		MachineClass.Queue.printList()
+		# Print queue
+		#MachineClass.Queue.printList()
 		
 
 
