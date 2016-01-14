@@ -13,9 +13,14 @@
 from Tkinter import *
 from datetime import datetime
 from math import log
-import plotly.plotly as py
-from plotly.graph_objs import Scatter
-import plotly.graph_objs as go
+#import plotly.plotly as py
+#from plotly.graph_objs import Scatter
+#import plotly.graph_objs as go
+from bokeh.plotting import figure, output_file, show
+from bokeh.charts import Bar, output_file, show
+from collections import OrderedDict
+import pandas
+
 import copy
 import random
 import tkMessageBox
@@ -140,58 +145,87 @@ class GUI(Tk):
 		self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
 
 	def plotNumJobsInSys(self, numClasses):
-		py.sign_in('mailacrs','wowbsbc0qo')
-		trace0 = Scatter(x=NumJobsTime, y=NumJobs)
-		data = [trace0]
-		layout = go.Layout(
-			title='Average Number of Jobs Over Time',
-			xaxis=dict(
-				title='Time',
-				titlefont=dict(
-				family='Courier New, monospace',
-				size=18,
-				color='#7f7f7f'
-			)
-		),
-			yaxis=dict(
-				title='Number of Jobs',
-				titlefont=dict(
-				family='Courier New, monospace',
-				size=18,
-				color='#7f7f7f'
-			)
-		)
-		)
-		fig = go.Figure(data=data, layout=layout)
-		unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys: Case1')
+		# SCATTER PLOT
+		output_file("SRPT_NumJobsInSys: Case 4")
+		scatter = figure(title = "Average Number of Jobs Over Time",
+						x_axis_label = "Time",
+						y_axis_label = "Number of Jobs")
+		#trace0.scatter(NumJobsTime, NumJobs)
+		scatter.line(NumJobsTime, NumJobs)
+		scatter.circle(NumJobsTime, NumJobs, size=1)
+		show(scatter)
+
+
 
 		#-----------------------------------------------------------------------------#
-		# Average jobs/class
-		trace1 = go.Bar(y= MachineClass.AvgNumJobsArray)
+		# BLOCK DIAGRAM
+		output_file("SRPT_NumJobsInSysPerClass: Case4")
+
+		classRange = range(1, numClasses + 1)
+		classes = [format(i,'02d') for i in classRange]
+
+		# remove placeholder element
+		MachineClass.AvgNumJobsArray.pop(0)
+
+		dictionary = {'number of jobs': MachineClass.AvgNumJobsArray, 'classes': classes}
+		df = pandas.DataFrame(data=dictionary)
+
+		bar = Bar(df, 'classes', values='number of jobs', title="test chart")
+		show(bar)
+
+	# def plotNumJobsInSys1(self, numClasses):
+	# 	py.sign_in('mailacrs','wowbsbc0qo')
+	# 	trace0 = Scatter(x=NumJobsTime, y=NumJobs)
+	# 	data = [trace0]
+	# 	layout = go.Layout(
+	# 		title='Average Number of Jobs Over Time',
+	# 		xaxis=dict(
+	# 			title='Time',
+	# 			titlefont=dict(
+	# 			family='Courier New, monospace',
+	# 			size=18,
+	# 			color='#7f7f7f'
+	# 		)
+	# 	),
+	# 		yaxis=dict(
+	# 			title='Number of Jobs',
+	# 			titlefont=dict(
+	# 			family='Courier New, monospace',
+	# 			size=18,
+	# 			color='#7f7f7f'
+	# 		)
+	# 	)
+	# 	)
+	# 	fig = go.Figure(data=data, layout=layout)
+	# 	unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys: Case1')
+
+	# 	#-----------------------------------------------------------------------------#
+	# 	# Average jobs/class
+	# 	trace1 = go.Bar(y= MachineClass.AvgNumJobsArray)
 		
-		data1 = [trace1]
-		layout1 = go.Layout(
-			title='Average Number of Jobs Per Class',
-			xaxis=dict(
-				title='Classes',
-				range=[1,numClasses],              # set range
-				titlefont=dict(
-				family='Courier New, monospace',
-				size=18,
-				color='#7f7f7f'
-			)
-		),
-			yaxis=dict(
-				title='Number of Jobs',
-				titlefont=dict(
-				family='Courier New, monospace',
-				size=18,
-				color='#7f7f7f'
-			)
-		)
-		)
-		fig1 = go.Figure(data=data1, layout=layout1)
-		unique_url1 = py.plot(fig1, filename = 'SRPT_NumJobsInSysPerClass: Case1')
+	# 	data1 = [trace1]
+	# 	layout1 = go.Layout(
+	# 		title='Average Number of Jobs Per Class',
+	# 		xaxis=dict(
+	# 			title='Classes',
+	# 			range=[1,numClasses],              # set range
+	# 			titlefont=dict(
+	# 			family='Courier New, monospace',
+	# 			size=18,
+	# 			color='#7f7f7f'
+	# 		)
+	# 	),
+	# 		yaxis=dict(
+	# 			title='Number of Jobs',
+	# 			titlefont=dict(
+	# 			family='Courier New, monospace',
+	# 			size=18,
+	# 			color='#7f7f7f'
+	# 		)
+	# 	)
+	# 	)
+	# 	fig1 = go.Figure(data=data1, layout=layout1)
+	# 	unique_url1 = py.plot(fig1, filename = 'SRPT_NumJobsInSysPerClass: Case1')
 
 	def calcVariance(self, List, avg):
 		var = 0
