@@ -325,7 +325,7 @@ class Input(LabelFrame):
 		self.errorMessage = StringVar()
 		self.comboboxVal = StringVar()
 
-		self.numServersInput.set(2)
+		self.numServersInput.set(2)					##################################CHANGE LATER	
 		self.loadInput.set(0.7)       		 	   	##################################CHANGE LATER
 		#self.arrivalRateInput.set(1.0)         	 ##################################CHANGE LATER
 		self.processingRateInput.set(0.5)   	    ##################################CHANGE LATER
@@ -379,12 +379,12 @@ class Input(LabelFrame):
 
 		# Distribution Dropdowns
 		self.distributions = ('Select Distribution', 'Poisson', 'Exponential', 'Uniform', 'Bounded Pareto', 'Custom')
-		self.comboBox_1 = ttk.Combobox(self, values = self.distributions, state = 'disabled')
-		self.comboBox_1.current(2) # set selection
-		self.comboBox_1.grid(row = 2, column = 5)
-		self.comboBox_2 = ttk.Combobox(self, textvariable = self.comboboxVal, values = self.distributions, state = 'readonly')
-		self.comboBox_2.current(4) # set default selection                  #####################CHANGE LATER
-		self.comboBox_2.grid(row = 3, column = 5)
+		self.ArrivalDistComboBox = ttk.Combobox(self, values = self.distributions, state = 'disabled')
+		self.ArrivalDistComboBox.current(2) # set selection
+		self.ArrivalDistComboBox.grid(row = 2, column = 5)
+		self.ProcessDistComboBox = ttk.Combobox(self, textvariable = self.comboboxVal, values = self.distributions, state = 'readonly')
+		self.ProcessDistComboBox.current(4) # set default selection                  #####################CHANGE LATER
+		self.ProcessDistComboBox.grid(row = 3, column = 5)
 
 		self.comboboxVal.trace("w", self.selectionChange) # refresh on change
 		self.refreshComboboxes()		
@@ -413,7 +413,7 @@ class Input(LabelFrame):
 		self.refreshComboboxes()
 
 	def refreshComboboxes(self):
-		selection = self.comboBox_2.get()
+		selection = self.ProcessDistComboBox.get()
 		if selection == 'Bounded Pareto':
 			self.procRateEntry.configure(state = 'disabled')
 		else:
@@ -459,8 +459,8 @@ class Input(LabelFrame):
 				return 0
 
 	def getDropDownValues(self):
-		comboBox1Value = self.comboBox_1.get()
-		comboBox2Value = self.comboBox_2.get()
+		comboBox1Value = self.ArrivalDistComboBox.get()
+		comboBox2Value = self.ProcessDistComboBox.get()
 		if comboBox2Value == 'Select Distribution':
 				self.errorMessage.set("You must select a distribution for the processing rate")
 				return 1
@@ -1144,7 +1144,7 @@ class MachineClass(object):
 #----------------------------------------------------------------------#
 def main():
 	window = GUI(None)                           			   # instantiate the class with no parent (None)
-	window.title('Single Server Approximate SRPT with Errors')  # title the window
+	window.title('Multi-Server Approximate SRPT with Errors')  # title the window
 
 	# Global variables used in JobClass
 	main.timesClicked = 0       
