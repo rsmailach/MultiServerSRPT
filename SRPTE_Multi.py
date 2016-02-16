@@ -16,6 +16,8 @@ import plotly.plotly as py
 from plotly.graph_objs import Scatter
 import plotly.graph_objs as go
 #from scipy import integrate as integrate
+from operator import attrgetter
+
 import copy
 import random
 import tkMessageBox
@@ -29,6 +31,7 @@ NumJobsTime = []
 TimeSys = []
 ProcTime = []
 PercError = []
+NUM_SERVERS = 0
 
 #----------------------------------------------------------------------#
 # Class: GUI
@@ -190,7 +193,11 @@ class GUI(Tk):
 	def submit(self, event):
 		self.updateStatusBar("Simulating...")
 		self.clearSavedArrivals()
-		I = Input(self)     
+		I = Input(self)
+
+		# Set global variable for num servers to value inputed
+		global NUM_SERVERS
+		NUM_SERVERS = I.valuesList[0]
 
 		self.printParams(I.valuesList[0],					#num Servers
 						 I.valuesList[1],					#load
@@ -212,7 +219,7 @@ class GUI(Tk):
 				I.valuesList[4],				# error max
 				I.valuesList[5])				# sim time
 
-		self.displayAverageData()
+		#self.displayAverageData()
 		#self.saveData()
 		self.updateStatusBar("Simulation complete.")
 
@@ -227,6 +234,7 @@ class GUI(Tk):
 class Input(LabelFrame):
 	def __init__(self, master):
 		LabelFrame.__init__(self, master, text = "Input")
+
 		self.master = master
 		self.numServersInput = IntVar()
 		self.loadInput = DoubleVar()
@@ -248,7 +256,7 @@ class Input(LabelFrame):
 		self.processingRateInput.set(self.procRateDefault)
 		self.percentErrorMinInput.set(-20)
 		self.percentErrorMaxInput.set(20)
-		self.simLengthInput.set(100000.0)
+		self.simLengthInput.set(100.0)
 
 		self.grid_columnconfigure(0, weight=2)
 		self.grid_columnconfigure(1, weight=2)
@@ -618,7 +626,7 @@ class LinkedList(object):
 			self.head = self.head.nextNode		# move head forward one node
 			LinkedList.Size -= 1
 		else:
-			GUI.writeToConsole(self.master, "ERROR: The linked list is already empty!")
+			print "ERROR: The linked list is already empty!!"
 
 	def clear(self):
 		self.head = None
@@ -753,9 +761,9 @@ class MachineClass(object):
 	PrevNumJobs = 0
 
 	StopSim = False
-	ProcessingJobs = []		# Array of current job in each server
-	ServiceStartTimes = [] 	# Start times of job in each server
-	ServersBusy = []
+	ServiceStartTimes = [None] * NUM_SERVERS	# Start times of job in each server
+	ProcessingJobs = [None] * NUM_SERVERS		# Array of current job in each server
+	ServersBusy = [False] * NUM_SERVERS			# Array of whether each server is busy
 
 	def __init__(self, master):
 		self.master = master
@@ -776,9 +784,9 @@ class MachineClass(object):
 		ProcTime[:] = []
 		PercError[:] = [] 
 		MachineClass.JobOrderOut[:] = []
-		MachineClass.ProcessingJobs[:] = [None] * numServers
-		MachineClass.ServiceStartTimes[:] = []
-		MachineClass.ServersBusy[:] = [False] * numServers
+		MachineClass.ServiceStartTimes = [None] * NUM_SERVERS
+		MachineClass.ProcessingJobs = [None] * NUM_SERVERS
+		MachineClass.ServersBusy = [False] * NUM_SERVERS
 	
 		self.ctr = 0
 
@@ -793,7 +801,9 @@ class MachineClass(object):
 		return ArrivalDistributions[arrDist]
 	
 	def getFirstQueued(self):
-		job = MachineClass.Queue.head.job
+		job = None
+		if (MachineClass.Queue.head != None):
+			job = MachineClass.Queue.head.job
 		return job
 
 	def removeFirstQueued(self):
@@ -801,9 +811,9 @@ class MachineClass(object):
 
 	#update data
 	def updateJobs(self):
-		for index in range(len(MachineClass.ServiceStartTimes)):
-			serviceTime = MachineClass.CurrentTime - MachineClass.ServiceStartTimes[index]
+		for index in range(NUM_SERVERS):
 			if(MachineClass.ProcessingJobs[index] != None):
+				serviceTime = MachineClass.CurrentTime - MachineClass.ServiceStartTimes[index]
 				MachineClass.ProcessingJobs[index].RPT -= serviceTime
 				MachineClass.ProcessingJobs[index].ERPT -= serviceTime
 
@@ -833,13 +843,13 @@ class MachineClass(object):
 		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
 
 	# Job arriving
-	def arrivalEvent(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax):
+	def arrivalEvent(self, numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax):
 		J = JobClass(self.master)
 		J.setJobAttributes(load, procRate, procDist, percErrorMin, percErrorMax, MachineClass.CurrentTime)
 		J.name = "Job%02d"%self.ctr
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
-		self.calcNumJobs(self.ctr)
+		#self.calcNumJobs(self.ctr)
 		self.saveArrivals(J)			# save to list of arrivals, for testing
 
 		self.updateJobs()				# update all processing jobs
@@ -860,53 +870,67 @@ class MachineClass(object):
 
 	# Processing first job in queue
 	def processJobs(self):
-		for index in range(len(MachineClass.Servers)):
-			if MachineClass.ServersBusy[index] == False: 	#Server not busy
-				currentJob = self.getFirstQueued()
-				MachineClass.ServiceStartTime[index] = MachineClass.CurrentTime
+		for index in range(NUM_SERVERS):
+			currentJob = self.getFirstQueued()
+
+			#Server not busy and a job is waiting is in the queue
+			if (MachineClass.ServersBusy[index] == False) and (currentJob != None): 	
+				MachineClass.ServiceStartTimes[index] = MachineClass.CurrentTime
 				MachineClass.ProcessingJobs[index] = currentJob
 				MachineClass.ServersBusy[index] = True
-				removeFirstQueued()
 				GUI.writeToConsole(self.master, "%.6f | %s processing on server %s"%(MachineClass.CurrentTime, currentJob.name, index))
+				self.removeFirstQueued()
 
 	# Job completed
-	def completionEvent(self):
-		currentJob = self.getProcessingJob()
-		MachineClass.ServerBusy = False
+	def completionEvent(self, completingJob):
+		# Server no longer busy
+		serverIndex = MachineClass.ProcessingJobs.index(completingJob)
+		MachineClass.ServersBusy[serverIndex] = False
+		MachineClass.ProcessingJobs[serverIndex] = None
+		MachineClass.ServiceStartTimes[serverIndex] = None
 
-		MachineClass.JobOrderOut.append(currentJob.name)
+		MachineClass.JobOrderOut.append(completingJob.name)
 		self.calcNumJobs(self.ctr)
 #		NumJobs.append(MachineClass.AvgNumJobs)			# y axis of plot
 #		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
-		TimeSys.append(MachineClass.CurrentTime - currentJob.arrivalTime)
-		ProcTime.append(currentJob.procTime)
-		PercError.append(abs(currentJob.percentError))
+		TimeSys.append(MachineClass.CurrentTime - completingJob.arrivalTime)
+		ProcTime.append(completingJob.procTime)
+		PercError.append(abs(completingJob.percentError))
 
-		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, currentJob.name))
-		MachineClass.Queue.removeHead() # remove job from queue
+		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, completingJob.name))
+
 
 	def run(self, numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, simLength):
-		has_run = False
 		while 1:
 			if(self.ctr == 0):	# set time of first job arrival
 				arrRate = float(load) / procRate
 				MachineClass.TimeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
 
-			#next event is arrival
-			if (MachineClass.ServerBusy == False) or ((MachineClass.ServerBusy == True) and (MachineClass.TimeUntilArrival < self.getProcessingJob().RPT)):
+			# Find shortest RPT of all processing jobs		
+			try:
+				minRPT = min(element.RPT for element in MachineClass.ProcessingJobs if element is not None)
+				l = [x for x in MachineClass.ProcessingJobs if (x is not None and x.RPT == minRPT)]
+				minProcJob = l[0]
+			except ValueError:
+				minRPT = -1	
+				minProcJob = None
+
+			# If all server is idle, or all servers busy and next arrival is before completion of shortest job processing next event is ARRIVAL
+			if (all(element == False for element in MachineClass.ServersBusy)) or (MachineClass.TimeUntilArrival < minRPT):
 				MachineClass.CurrentTime += MachineClass.TimeUntilArrival
 
 				# stop server from processing current job
-				MachineClass.ServerBusy == False
-				self.arrivalEvent(load, arrDist, procRate, procDist, percErrorMin, percErrorMax)
+				#MachineClass.ServerBusy == False
+				self.arrivalEvent(numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax)
 			
-			#next event is job finishing			
+			#next event is job finishing (job with shortest RPT)			
 			else:
-				MachineClass.CurrentTime += self.getProcessingJob().RPT
-				self.completionEvent()
+				completingJob = minProcJob
+				MachineClass.CurrentTime += completingJob.RPT
+				self.completionEvent(completingJob)
 
 				if(MachineClass.Queue.Size > 0):
-					self.processJob()
+					self.processJobs()
 
 			# If current time is greater than the simulation length, end program
 			if (MachineClass.CurrentTime > simLength) or (MachineClass.StopSim == True):
