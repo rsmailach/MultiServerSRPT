@@ -747,12 +747,15 @@ class MachineClass(object):
 	JobOrderOut = []
 	CurrentTime = 0.0
 	TimeUntilArrival = 0.0
-	ServiceStartTime = 0
+	
 	AvgNumJobs = 0
 	PrevTime = 0
 	PrevNumJobs = 0
-	ServerBusy = False
+
 	StopSim = False
+	ProcessingJobs = []		# Array of current job in each server
+	ServiceStartTimes = [] 	# Start times of job in each server
+	ServersBusy = []
 
 	def __init__(self, master):
 		self.master = master
@@ -762,7 +765,7 @@ class MachineClass(object):
 		LinkedList.Size = 0
 		MachineClass.CurrentTime = 0.0
 		MachineClass.TimeUntilArrival = 0.0
-		MachineClass.ServiceStartTime = 0
+		
 		MachineClass.AvgNumJobs = 0
 		MachineClass.PrevTime = 0
 		MachineClass.PrevNumJobs = 0
@@ -773,6 +776,9 @@ class MachineClass(object):
 		ProcTime[:] = []
 		PercError[:] = [] 
 		MachineClass.JobOrderOut[:] = []
+		MachineClass.ProcessingJobs[:] = [None] * numServers
+		MachineClass.ServiceStartTimes[:] = []
+		MachineClass.ServersBusy[:] = [False] * numServers
 	
 		self.ctr = 0
 
@@ -786,16 +792,20 @@ class MachineClass(object):
 		}
 		return ArrivalDistributions[arrDist]
 	
-	def getProcessingJob(self):
-		currentJob = MachineClass.Queue.head.job
-		return currentJob
+	def getFirstQueued(self):
+		job = MachineClass.Queue.head.job
+		return job
+
+	def removeFirstQueued(self):
+		MachineClass.Queue.removeHead()	# remove first job from queue
 
 	#update data
-	def updateJob(self):
-		currentJob = self.getProcessingJob()
-		serviceTime = MachineClass.CurrentTime - MachineClass.ServiceStartTime
-		currentJob.RPT -= serviceTime
-		currentJob.ERPT -= serviceTime
+	def updateJobs(self):
+		for index in range(len(MachineClass.ServiceStartTimes)):
+			serviceTime = MachineClass.CurrentTime - MachineClass.ServiceStartTimes[index]
+			if(MachineClass.ProcessingJobs[index] != None):
+				MachineClass.ProcessingJobs[index].RPT -= serviceTime
+				MachineClass.ProcessingJobs[index].ERPT -= serviceTime
 
 	def calcNumJobs(self, jobID):
 		if(MachineClass.ServerBusy == True):
@@ -822,8 +832,6 @@ class MachineClass(object):
 		NumJobs.append(MachineClass.AvgNumJobs)			# y axis of plot
 		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
 
-
-
 	# Job arriving
 	def arrivalEvent(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax):
 		J = JobClass(self.master)
@@ -832,35 +840,16 @@ class MachineClass(object):
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
 		self.calcNumJobs(self.ctr)
-		self.saveArrivals(J)					# save to list of arrivals, for testing
+		self.saveArrivals(J)			# save to list of arrivals, for testing
 
-		if(MachineClass.Queue.Size > 0):
-			self.updateJob()	# update data in queue
+		self.updateJobs()				# update all processing jobs
+
 		MachineClass.Queue.insert(J)	# add job to queue
-		self.processJob()	# process first job in queue
+		self.processJobs()				# process first job in queue
 
 		# Generate next arrival
 		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, arrDist)
 		self.ctr += 1
-
-	def insertLargeJob(self, procDist):
-		J = JobClass(self.master)
-		J.setJobAttributes(1, 1, procDist, 1, MachineClass.CurrentTime)
-		J.name = "JobXXXXX"
-		J.RPT = 10000
-		J.ERPT = 1
-		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
-		
-		self.calcNumJobs(self.ctr)
-		self.saveArrivals(J)					# save to list of arrivals, for testing
-
-		if(MachineClass.Queue.Size > 0):
-			self.updateJob()	# update data in queue
-		MachineClass.Queue.insert(J)	# add job to queue
-		self.processJob()	# process first job in queue
-
-		# Generate next arrival
-		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, 'Exponential')
 
 	def saveArrivals(self, job):
 		text = "%s,       %.4f,      %.4f,      %.4f"%(job.name, job.arrivalTime, job.RPT, job.ERPT) + "\n"
@@ -870,11 +859,15 @@ class MachineClass(object):
 		myFile.close()
 
 	# Processing first job in queue
-	def processJob(self):
-		MachineClass.ServiceStartTime = MachineClass.CurrentTime
-		currentJob = self.getProcessingJob()
-		GUI.writeToConsole(self.master, "%.6f | %s processing, ERPT = %.5f"%(MachineClass.CurrentTime, currentJob.name, currentJob.ERPT))
-		MachineClass.ServerBusy = True
+	def processJobs(self):
+		for index in range(len(MachineClass.Servers)):
+			if MachineClass.ServersBusy[index] == False: 	#Server not busy
+				currentJob = self.getFirstQueued()
+				MachineClass.ServiceStartTime[index] = MachineClass.CurrentTime
+				MachineClass.ProcessingJobs[index] = currentJob
+				MachineClass.ServersBusy[index] = True
+				removeFirstQueued()
+				GUI.writeToConsole(self.master, "%.6f | %s processing on server %s"%(MachineClass.CurrentTime, currentJob.name, index))
 
 	# Job completed
 	def completionEvent(self):
@@ -892,9 +885,6 @@ class MachineClass(object):
 		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, currentJob.name))
 		MachineClass.Queue.removeHead() # remove job from queue
 
-
-
-
 	def run(self, numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, simLength):
 		has_run = False
 		while 1:
@@ -902,20 +892,16 @@ class MachineClass(object):
 				arrRate = float(load) / procRate
 				MachineClass.TimeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
 
-			# If no jobs in system, or time to arrival is less than remaining processing time of job currently processing
-			#if (MachineClass.CurrentTime >= 5000 and has_run == False):
-			#	self.insertLargeJob(procDist)
-			#	has_run = True
-
+			#next event is arrival
 			if (MachineClass.ServerBusy == False) or ((MachineClass.ServerBusy == True) and (MachineClass.TimeUntilArrival < self.getProcessingJob().RPT)):
-				#next event is arrival
 				MachineClass.CurrentTime += MachineClass.TimeUntilArrival
 
 				# stop server from processing current job
 				MachineClass.ServerBusy == False
 				self.arrivalEvent(load, arrDist, procRate, procDist, percErrorMin, percErrorMax)
+			
+			#next event is job finishing			
 			else:
-				#next event is job finishing
 				MachineClass.CurrentTime += self.getProcessingJob().RPT
 				self.completionEvent()
 
