@@ -20,6 +20,7 @@ from bokeh.plotting import figure, output_file, show
 from bokeh.charts import Bar, output_file, show
 from collections import OrderedDict
 import pandas
+from itertools import cycle
 
 import copy
 import random
@@ -755,6 +756,11 @@ class LinkedList(object):
 		else:
 			print "ERROR: The linked list is already empty!"
 
+	# Return first item in queue
+	def getHead(self):
+		if(LinkedList.Size > 0):
+			return self.head
+
 	def clear(self):
 		LinkedList.Size = 0
 		self.head = None
@@ -896,7 +902,7 @@ class JobClass(object):
 #
 #----------------------------------------------------------------------#
 class MachineClass(object):
-	Queue = LinkedList()
+	#Queue = LinkedList()
 	PreviousJobs = []
 	LastClassPrevJobs = []
 	CurrentTime = 0.0
@@ -907,6 +913,8 @@ class MachineClass(object):
 	ServiceStartTimes = [None] * NUM_SERVERS	# Start times of job in each server
 	ProcessingJobs = [None] * NUM_SERVERS		# Array of current job in each server
 	ServersBusy = [False] * NUM_SERVERS			# Array of whether each server is busy	
+
+	LastRoutedTo = []
 
 	PrevTime = 0
 	PrevTimeA = 0
@@ -919,7 +927,7 @@ class MachineClass(object):
 
 	def __init__(self, master):
 		self.master = master
-		MachineClass.Queue.clear()
+		#MachineClass.Queue.clear()
 		MachineClass.PreviousJobs[:] = []
 		MachineClass.LastClassPrevJobs[:] = []
 		MachineClass.CurrentTime = 0.0
@@ -928,10 +936,15 @@ class MachineClass(object):
 		#MachineClass.ServerBusy = False
 		MachineClass.StopSim = False
 
+		for queue in range(len(MachineClass.ServerQueues)):
+			MachineClass.ServerQueues[queue].clear()
 		MachineClass.ServerQueues = [LinkedList()] * NUM_SERVERS
+
 		MachineClass.ServiceStartTimes = [None] * NUM_SERVERS
 		MachineClass.ProcessingJobs = [None] * NUM_SERVERS
 		MachineClass.ServersBusy = [False] * NUM_SERVERS
+
+		MachineClass.LastRoutedTo[:] = []
 
 
 		MachineClass.PrevTime = 0
@@ -960,14 +973,14 @@ class MachineClass(object):
 		}
 		return ArrivalDistributions[arrDist]
 	
-	def getFirstQueued(self):
-		job = None
-		if (MachineClass.Queue.head != None):
-			job = MachineClass.Queue.head.job
-		return job
+	#def getFirstQueued(self):
+	#	job = None
+	#	if (MachineClass.Queue.head != None):
+	#		job = MachineClass.Queue.head.job
+	#	return job
 
-	def removeFirstQueued(self):
-		MachineClass.Queue.removeHead()	# remove first job from queue
+	#def removeFirstQueued(self):
+	#	MachineClass.Queue.removeHead()	# remove first job from queue
 
 	#update data
 	def updateJobs(self):
@@ -1010,20 +1023,33 @@ class MachineClass(object):
 	# Router sends job to servers and adds job to their queue
 	# Compare to server last routed to of the same class, send to next one
 	def router(self, job, numClasses):
-		lastRoutedTo = list(range(0, numClasses))			# List of last server jobs sent to from each class
-															# Starts with each class routing to a different server
-															# Class 0 routes to server 0, class 1 routes to server 1...
+		# Set up last routed to once
+		servers = cycle(range(0, NUM_SERVERS))
+		if(self.ctr == 0):
+			MachineClass.LastRoutedTo = [0] * numClasses
+			
 
-		# For each priority class, if the incoming job matches the iterator, 
-		for index in range(len(lastRoutedTo)):
-			if (job.priorityClass == index):
-				lastRoutedTo[index] += 1					# Update where we have routed to so as to go to next server next time.
-				if(lastRoutedTo[index] > NUM_SERVERS):		# Reset after full loop of servers
-					lastRoutedTo[index] = 0
-				self.sendJobToServer(job, index, numClasses)
+			for item in range(len(MachineClass.LastRoutedTo)):
+				MachineClass.LastRoutedTo[item] = next(servers)		# List of last server jobs sent to from each class
+																	# Starts with each class routing to a different server
+																	# Class 0 routes to server 0, class 1 routes to server 1...
+			self.sendJobToServer(job, 0, numClasses)	#First job is always Class 0, so update for next arrival																
+			MachineClass.LastRoutedTo[0] += 1
+			print MachineClass.LastRoutedTo
+		else:
+			# For each priority class, if the incoming job matches the iterator, 
+			for index in range(len(MachineClass.LastRoutedTo)):
+				if (job.priorityClass == index):
+					self.sendJobToServer(job, MachineClass.LastRoutedTo[index], numClasses)
+					MachineClass.LastRoutedTo[index] += 1						# Update where we have routed to so as to go to next server next time.
+					if(MachineClass.LastRoutedTo[index] > (NUM_SERVERS-1)):		# Reset after full loop of servers
+						MachineClass.LastRoutedTo[index] = 0
+					
+			print MachineClass.LastRoutedTo		
 
 	# Send job to server i
 	def sendJobToServer(self, job, i, numClasses):
+		GUI.writeToConsole(self.master, "sending %s to server %s"%(job.name, i))
 	##	FOR EACH QUEUE, 
 		# If job is in the last class, sort by LCFS
 		if (job.priorityClass == numClasses):
@@ -1034,47 +1060,48 @@ class MachineClass(object):
 			MachineClass.ServerQueues[i].insertByClass(job)				# add job to queue
 		
 		# Print queue
-		MachineClass.ServerQueues[i].printList(i)
+		#print MachineClass.CurrentTime
+		#MachineClass.ServerQueues[i].printList(i)
 
 
-	def calcNumJobs(self, jobID):
-		self.currentNumJobs = MachineClass.Queue.Size
-		self.t = MachineClass.CurrentTime
-		self.delta_t = self.t - MachineClass.PrevTime 
+	# def calcNumJobs(self, jobID):
+	# 	self.currentNumJobs = MachineClass.Queue.Size
+	# 	self.t = MachineClass.CurrentTime
+	# 	self.delta_t = self.t - MachineClass.PrevTime 
 
-		# If one job in system
-		if(jobID == 0):
-			MachineClass.AvgNumJobs = 1 # First event is always create new job
-		# UPDATE 
-		else:
-			MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) + float(MachineClass.PrevNumJobs)*(float(self.delta_t)/self.t)
+	# 	# If one job in system
+	# 	if(jobID == 0):
+	# 		MachineClass.AvgNumJobs = 1 # First event is always create new job
+	# 	# UPDATE 
+	# 	else:
+	# 		MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) + float(MachineClass.PrevNumJobs)*(float(self.delta_t)/self.t)
 			
-		# PrevTime becomes "old" t
-		MachineClass.PrevTime = self.t 
-		# PrevNum jobs becomes current num jobs
-		MachineClass.PrevNumJobs = self.currentNumJobs
+	# 	# PrevTime becomes "old" t
+	# 	MachineClass.PrevTime = self.t 
+	# 	# PrevNum jobs becomes current num jobs
+	# 	MachineClass.PrevNumJobs = self.currentNumJobs
 
 
-	def calcNumJobsPerClass(self, numClasses):
-		numJobsArray = list(MachineClass.Queue.countClassesQueued(numClasses))
+	# def calcNumJobsPerClass(self, numClasses):
+	# 	numJobsArray = list(MachineClass.Queue.countClassesQueued(numClasses))
 
-		self.t = MachineClass.CurrentTime 
-		self.delta_t = self.t - MachineClass.PrevTimeA
+	# 	self.t = MachineClass.CurrentTime 
+	# 	self.delta_t = self.t - MachineClass.PrevTimeA
 
-		for i in range(0, numClasses):
-			# If one job in system
-			if(MachineClass.counter == 0):
-				MachineClass.PrevNumJobsArray = [0] * (numClasses) 			# creates array of size (numClasses + 1) filled with 0s
-				MachineClass.AvgNumJobsArray = list(numJobsArray)			# First event is always create new job
-				MachineClass.counter = 1
-			# UPDATE 
-			else:
-				MachineClass.AvgNumJobsArray[i] = (float(MachineClass.PrevTimeA)/self.t)*float(MachineClass.AvgNumJobsArray[i]) + float(MachineClass.PrevNumJobsArray[i])*(float(self.delta_t)/self.t)
+	# 	for i in range(0, numClasses):
+	# 		# If one job in system
+	# 		if(MachineClass.counter == 0):
+	# 			MachineClass.PrevNumJobsArray = [0] * (numClasses) 			# creates array of size (numClasses + 1) filled with 0s
+	# 			MachineClass.AvgNumJobsArray = list(numJobsArray)			# First event is always create new job
+	# 			MachineClass.counter = 1
+	# 		# UPDATE 
+	# 		else:
+	# 			MachineClass.AvgNumJobsArray[i] = (float(MachineClass.PrevTimeA)/self.t)*float(MachineClass.AvgNumJobsArray[i]) + float(MachineClass.PrevNumJobsArray[i])*(float(self.delta_t)/self.t)
 									
-		# PrevTime becomes "old" t (set in regular caclulation)
-		MachineClass.PrevTimeA = self.t 
-		# PrevNum jobs becomes current num jobs
-		MachineClass.PrevNumJobsArray = list(numJobsArray)
+	# 	# PrevTime becomes "old" t (set in regular caclulation)
+	# 	MachineClass.PrevTimeA = self.t 
+	# 	# PrevNum jobs becomes current num jobs
+	# 	MachineClass.PrevNumJobsArray = list(numJobsArray)
 
 	# Job arriving
 	def arrivalEvent(self, load, arrDist, procRate, procDist, numClasses, percErrorMin, percErrorMax):
@@ -1099,21 +1126,22 @@ class MachineClass(object):
 
 	# Processing first job in queue
 	def processJobs(self):
-		for index in range(NUM_SERVERS):
-			currentJob = self.getFirstQueued()
+		for i in range(NUM_SERVERS):
+			#Server i not busy and a job is waiting in the queue
+			if (MachineClass.ServersBusy[i] == False) and (MachineClass.ServerQueues[i].Size > 0):
+				currentJob = MachineClass.ServerQueues[i].getHead().job
+				GUI.writeToConsole(self.master, "%s is first at server %s------------------------------------------"%(currentJob.name, i))
 
-			#Server not busy and a job is waiting is in the queue
-			if (MachineClass.ServersBusy[index] == False) and (currentJob != None): 	
-				MachineClass.ServiceStartTimes[index] = MachineClass.CurrentTime
-				MachineClass.ProcessingJobs[index] = currentJob
-				MachineClass.ServersBusy[index] = True
-				GUI.writeToConsole(self.master, "%.6f | %s processing on server %s"%(MachineClass.CurrentTime, currentJob.name, index))
-				self.removeFirstQueued()
+				MachineClass.ServiceStartTimes[i] = MachineClass.CurrentTime
+				MachineClass.ProcessingJobs[i] = currentJob
+				MachineClass.ServersBusy[i] = True
+				GUI.writeToConsole(self.master, "%.6f | %s processing on server %s"%(MachineClass.CurrentTime, currentJob.name, i))
+				MachineClass.ServerQueues[i].removeHead()
 
 	# Job completed
 	def completionEvent(self, numClasses, completingJob):
 		completingJob.completionTime = MachineClass.CurrentTime
-		self.saveArrivals(J)												# Save to list of arrivals, for testing
+		self.saveArrivals(completingJob)							# Save to list of arrivals, for testing
 
 		#self.calcNumJobs(self.ctr)
 		#self.calcNumJobsPerClass(numClasses)
@@ -1163,8 +1191,7 @@ class MachineClass(object):
 				MachineClass.CurrentTime += completingJob.RPT
 				self.completionEvent(numClasses, completingJob)
 
-				if(MachineClass.Queue.Size > 0):
-					self.ProcessingJobs()
+				self.processJobs()
 
 			# If current time is greater than the simulation length, end program
 			if (MachineClass.CurrentTime > simLength) or (MachineClass.StopSim == True):
