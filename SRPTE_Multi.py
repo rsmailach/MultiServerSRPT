@@ -16,8 +16,6 @@ import plotly.plotly as py
 from plotly.graph_objs import Scatter
 import plotly.graph_objs as go
 #from scipy import integrate as integrate
-from operator import attrgetter
-
 import copy
 import random
 import tkMessageBox
@@ -211,7 +209,7 @@ class GUI(Tk):
 		
 		# Start process
 		MC = MachineClass(self)
-		MC.run(	I.valuesList[0],					#num Servers
+		MC.run(	#I.valuesList[0],					#num Servers
 				I.valuesList[1],					#load
 				'Exponential',					# arrival
 				I.valuesList[2], I.distList[1],	# processing
@@ -767,12 +765,15 @@ class MachineClass(object):
 
 	def __init__(self, master):
 		self.master = master
-		MachineClass.ServerBusy = False
-		MachineClass.StopSim = False
 		MachineClass.Queue.clear()
 		LinkedList.Size = 0
 		MachineClass.CurrentTime = 0.0
 		MachineClass.TimeUntilArrival = 0.0
+		MachineClass.StopSim = False	
+
+		MachineClass.ServiceStartTimes = [None] * NUM_SERVERS
+		MachineClass.ProcessingJobs = [None] * NUM_SERVERS
+		MachineClass.ServersBusy = [False] * NUM_SERVERS			
 		
 		MachineClass.AvgNumJobs = 0
 		MachineClass.PrevTime = 0
@@ -784,10 +785,7 @@ class MachineClass(object):
 		ProcTime[:] = []
 		PercError[:] = [] 
 		MachineClass.JobOrderOut[:] = []
-		MachineClass.ServiceStartTimes = [None] * NUM_SERVERS
-		MachineClass.ProcessingJobs = [None] * NUM_SERVERS
-		MachineClass.ServersBusy = [False] * NUM_SERVERS
-	
+
 		self.ctr = 0
 
 	# Dictionary of arrival distributions
@@ -843,26 +841,26 @@ class MachineClass(object):
 		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
 
 	# Job arriving
-	def arrivalEvent(self, numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax):
+	def arrivalEvent(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax):
 		J = JobClass(self.master)
 		J.setJobAttributes(load, procRate, procDist, percErrorMin, percErrorMax, MachineClass.CurrentTime)
 		J.name = "Job%02d"%self.ctr
 
-		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
 		#self.calcNumJobs(self.ctr)
-		self.saveArrivals(J)			# save to list of arrivals, for testing
 
 		self.updateJobs()				# update all processing jobs
 
 		MachineClass.Queue.insert(J)	# add job to queue
 		self.processJobs()				# process first job in queue
 
+		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))		
+
 		# Generate next arrival
 		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, arrDist)
 		self.ctr += 1
 
 	def saveArrivals(self, job):
-		text = "%s,       %.4f,      %.4f,      %.4f"%(job.name, job.arrivalTime, job.RPT, job.ERPT) + "\n"
+		text = "%s,%.6f,%.6f,%.6f"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.completionTime) + "\n"
 		
 		with open("Arrivals.txt", "a") as myFile:
 			myFile.write(text)
@@ -883,14 +881,17 @@ class MachineClass(object):
 
 	# Job completed
 	def completionEvent(self, completingJob):
+		completingJob.completionTime = MachineClass.CurrentTime
+		self.saveArrivals(J)			# save to list of arrivals, for testing
+
 		# Server no longer busy
 		serverIndex = MachineClass.ProcessingJobs.index(completingJob)
 		MachineClass.ServersBusy[serverIndex] = False
 		MachineClass.ProcessingJobs[serverIndex] = None
 		MachineClass.ServiceStartTimes[serverIndex] = None
 
-		MachineClass.JobOrderOut.append(completingJob.name)
-		self.calcNumJobs(self.ctr)
+		#MachineClass.JobOrderOut.append(completingJob.name)
+		#self.calcNumJobs(self.ctr)
 #		NumJobs.append(MachineClass.AvgNumJobs)			# y axis of plot
 #		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
 		TimeSys.append(MachineClass.CurrentTime - completingJob.arrivalTime)
@@ -900,7 +901,7 @@ class MachineClass(object):
 		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, completingJob.name))
 
 
-	def run(self, numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, simLength):
+	def run(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, simLength):
 		while 1:
 			if(self.ctr == 0):	# set time of first job arrival
 				arrRate = float(load) / procRate
@@ -915,13 +916,13 @@ class MachineClass(object):
 				minRPT = -1	
 				minProcJob = None
 
-			# If all server is idle, or all servers busy and next arrival is before completion of shortest job processing next event is ARRIVAL
+			# If all servers are idle, or next arrival is before completion of shortest job processing next event is ARRIVAL
 			if (all(element == False for element in MachineClass.ServersBusy)) or (MachineClass.TimeUntilArrival < minRPT):
 				MachineClass.CurrentTime += MachineClass.TimeUntilArrival
 
 				# stop server from processing current job
 				#MachineClass.ServerBusy == False
-				self.arrivalEvent(numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax)
+				self.arrivalEvent(load, arrDist, procRate, procDist, percErrorMin, percErrorMax)
 			
 			#next event is job finishing (job with shortest RPT)			
 			else:

@@ -34,6 +34,7 @@ NumJobsTime = []
 TimeSys = []
 ProcTime = []
 PercError = []
+NUM_SERVERS = 0
 
 #----------------------------------------------------------------------#
 # Class: GUI
@@ -136,6 +137,7 @@ class GUI(Tk):
 	def printParams(self, numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, numClasses, simLength): 
 		self.writeToConsole("--------------------------------------------------------------------------------")
 		self.writeToConsole("PARAMETERS:")
+		self.writeToConsole("Number of Servers = %s"%numServers)
 		self.writeToConsole("Load = %.4f"%load)
 		#self.writeToConsole("Arrival Rate = %.4f"%arrRate)
 		self.writeToConsole("Arrival Distribution = %s"%arrDist)
@@ -274,7 +276,11 @@ class GUI(Tk):
 	def submit(self, event):
 		self.updateStatusBar("Simulating...")
 		self.clearSavedArrivals()
-		I = Input(self)     
+		I = Input(self)   
+
+		# Set global variable for num servers to value inputed  
+		global NUM_SERVERS
+		NUM_SERVERS = I.valuesList[0]
 
 		self.printParams(I.valuesList[0],					#num Servers
 						 I.valuesList[1],					#load
@@ -902,6 +908,10 @@ class MachineClass(object):
 	JobInService = None
 	StopSim = False	
 
+	ServiceStartTimes = [None] * NUM_SERVERS	# Start times of job in each server
+	ProcessingJobs = [None] * NUM_SERVERS		# Array of current job in each server
+	ServersBusy = [False] * NUM_SERVERS			# Array of whether each server is busy	
+
 	PrevTime = 0
 	PrevTimeA = 0
 	PrevNumJobs = 0
@@ -923,6 +933,10 @@ class MachineClass(object):
 		MachineClass.ServerBusy = False
 		MachineClass.JobInService = None
 		MachineClass.StopSim = False
+
+		MachineClass.ServiceStartTimes = [None] * NUM_SERVERS	# Start times of job in each server
+		MachineClass.ProcessingJobs = [None] * NUM_SERVERS		# Array of current job in each server
+		MachineClass.ServersBusy = [False] * NUM_SERVERS			# Array of whether each server is busy	
 
 
 		MachineClass.PrevTime = 0
@@ -957,11 +971,12 @@ class MachineClass(object):
 		return currentJob
 
 	#update data
-	def updateJob(self):
-		currentJob = self.getProcessingJob()
-		serviceTime = MachineClass.CurrentTime - MachineClass.ServiceStartTime
-		currentJob.RPT -= serviceTime
-		currentJob.ERPT -= serviceTime
+	def updateJobs(self):
+		for index in range(NUM_SERVERS):
+			if(MachineClass.ProcessingJobs[index] != None):
+				serviceTime = MachineClass.CurrentTime - MachineClass.ServiceStartTimes[index]
+				MachineClass.ProcessingJobs[index].RPT -= serviceTime
+				MachineClass.ProcessingJobs[index].ERPT -= serviceTime
 
 	def saveArrivals(self, job):
 		text = "%s,       %.4f,      %.4f,      %.4f,      %s"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.priorityClass) + "\n"
@@ -1087,11 +1102,16 @@ class MachineClass(object):
 
 	# Processing first job in queue
 	def processJob(self):
-		MachineClass.ServiceStartTime = MachineClass.CurrentTime
-		MachineClass.JobInService = self.getProcessingJob()
-		MachineClass.ServiceFinishTime = MachineClass.CurrentTime + MachineClass.JobInService.RPT
-		GUI.writeToConsole(self.master, "%.6f | %s processing, class = %s"%(MachineClass.CurrentTime, MachineClass.JobInService.name, MachineClass.JobInService.priorityClass))
-		MachineClass.ServerBusy = True
+		for index in range(NUM_SERVERS):
+			currentJob = self.getFirstQueued()
+
+			#Server not busy and a job is waiting is in the queue
+			if (MachineClass.ServersBusy[index] == False) and (currentJob != None): 	
+				MachineClass.ServiceStartTimes[index] = MachineClass.CurrentTime
+				MachineClass.ProcessingJobs[index] = currentJob
+				MachineClass.ServersBusy[index] = True
+				GUI.writeToConsole(self.master, "%.6f | %s processing on server %s"%(MachineClass.CurrentTime, currentJob.name, index))
+				self.removeFirstQueued()
 
 	# Job completed
 	def completionEvent(self, numClasses):
@@ -1113,7 +1133,6 @@ class MachineClass(object):
 
 
 	def run(self, numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, numClasses, simLength):
-		has_run = False
 		while 1:
 			# Generate time of first job arrival
 			if(self.ctr == 0):
