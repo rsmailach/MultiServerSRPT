@@ -650,6 +650,7 @@ class JobClass(object):
 	def __init__(self, master):
 		self.master = master
 		self.arrivalTime = 0
+		self.completionTime = 0
 		self.procTime = 0
 		self.RPT = 0		# Real Remaining Processing Time
 		self.ERPT = 0		# Estimated Remaining Processing Time
@@ -846,23 +847,46 @@ class MachineClass(object):
 		J.setJobAttributes(load, procRate, procDist, percErrorMin, percErrorMax, MachineClass.CurrentTime)
 		J.name = "Job%02d"%self.ctr
 
+		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))	
+
 		#self.calcNumJobs(self.ctr)
 
 		self.updateJobs()				# update all processing jobs
 
-		MachineClass.Queue.insert(J)	# add job to queue
-		self.processJobs()				# process first job in queue
+		# Find longest RPT of all processing jobs
+		try:				
+			maxERPT = max(element.ERPT for element in MachineClass.ProcessingJobs if element is not None)
+			l = [x for x in MachineClass.ProcessingJobs if (x is not None and x.ERPT == maxERPT)]
+			maxProcJob = l[0]
 
-		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))		
+			# Preempt largest job processing if all servers busy
+			if (maxERPT > J.ERPT)and(all(element == True for element in MachineClass.ServersBusy)):
+				GUI.writeToConsole(self.master, "%.6f | %s preempting %s"%(MachineClass.CurrentTime, J.name, maxProcJob.name))
+				#Remove maxProcJob from server
+				serverIndex = MachineClass.ProcessingJobs.index(maxProcJob)
+				MachineClass.ServersBusy[serverIndex] = False
+				MachineClass.ProcessingJobs[serverIndex] = None
+				MachineClass.ServiceStartTimes[serverIndex] = None
+
+				#add back to queue
+				MachineClass.Queue.insert(maxProcJob)	# add job to queue
+				GUI.writeToConsole(self.master, "%.6f | %s added back to queue, ERPT = %.5f"%(MachineClass.CurrentTime, maxProcJob.name, maxProcJob.ERPT))
+
+		except ValueError:
+			maxERPT = 10^100
+			maxProcJob = None			
+
+		MachineClass.Queue.insert(J)	# add job to queue
+		self.processJobs()				# process first job in queue	
 
 		# Generate next arrival
 		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, arrDist)
 		self.ctr += 1
 
 	def saveArrivals(self, job):
-		text = "%s,%.6f,%.6f,%.6f"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.completionTime) + "\n"
+		text = "%s,%.6f,%.6f,%.6f,%.6f"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.completionTime) + "\n"
 		
-		with open("Arrivals.txt", "a") as myFile:
+		with open("Jobs.txt", "a") as myFile:
 			myFile.write(text)
 		myFile.close()
 
@@ -882,7 +906,7 @@ class MachineClass(object):
 	# Job completed
 	def completionEvent(self, completingJob):
 		completingJob.completionTime = MachineClass.CurrentTime
-		self.saveArrivals(J)			# save to list of arrivals, for testing
+		self.saveArrivals(completingJob)			# save to list of arrivals, for testing
 
 		# Server no longer busy
 		serverIndex = MachineClass.ProcessingJobs.index(completingJob)
