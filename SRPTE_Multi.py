@@ -23,6 +23,8 @@ ProcTime = []
 PercError = []
 NUM_SERVERS = 0
 
+
+
 #----------------------------------------------------------------------#
 # Class: GUI
 #
@@ -165,9 +167,9 @@ class GUI(Tk):
 
 	def submit(self, event):
 		self.updateStatusBar("Simulating...")
-		self.clearSavedJobs()
-		self.clearSavedArrivals()
-		self.clearSavedNumJobs()
+		#self.clearSavedJobs()
+		#self.clearSavedArrivals()
+		#self.clearSavedNumJobs()
 		I = Input(self)
 
 		# Set global variable for num servers to value inputed
@@ -821,29 +823,41 @@ class MachineClass(object):
 		# PrevNum jobs becomes current num jobs
 		MachineClass.PrevNumJobs = self.currentNumJobs
 
-		#NumJobs.append(MachineClass.AvgNumJobs)			# y axis of plot
-		#NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
-
-		self.saveNumJobs(MachineClass.CurrentTime, self.currentNumJobs, MachineClass.AvgNumJobs)
-
-	def saveNumJobs(self, currentTime, avgNumJobs, currentNumJobs):
-		text = "%.6f,%s,%.6f"%(currentTime, avgNumJobs, currentNumJobs) + "\n"
 		
-		with open("AvgNumberOfJobs.xls", "a") as myFile:
+
+	def saveNumJobs(self, currentTime, avgNumJobs, load, errorMin, errorMax):
+		text = "%.6f,%.6f"%(currentTime, avgNumJobs) + "\n"
+
+		if (abs(errorMin) == errorMax):
+			self.error = str(int(errorMax))
+		else:
+			self.error = str(int(errorMin)) + "_" + str(int(errorMax))
+		
+		with open("NumJobs_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
 			myFile.write(text)
 		myFile.close()		
 
-	def saveArrivals(self, job):
+	def saveArrivals(self, job, load, errorMin, errorMax):
 		text = "%s,%.6f,%.6f,%.6f"%(job.name, job.arrivalTime, job.RPT, job.ERPT) + "\n"
+
+		if (abs(errorMin) == errorMax):
+			self.error = str(int(errorMax))
+		else:
+			self.error = str(int(errorMin)) + "_" + str(int(errorMax))	
 		
-		with open("Arrivals.xls", "a") as myFile:
+		with open("Arrivals_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
 			myFile.write(text)
 		myFile.close()		
 
-	def saveJobs(self, job):
+	def saveJobs(self, job, load, errorMin, errorMax):
 		text = "%s,%.6f"%(job.name, job.completionTime) + "\n"
-		
-		with open("Jobs.xls", "a") as myFile:
+
+		if (abs(errorMin) == errorMax):
+			self.error = str(int(errorMax))
+		else:
+			self.error = str(int(errorMin)) + "_" + str(int(errorMax))
+
+		with open("Jobs_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
 			myFile.write(text)
 		myFile.close()				
 
@@ -881,8 +895,9 @@ class MachineClass(object):
 			maxProcJob = None			
 
 		MachineClass.Queue.insert(J)	# add job to queue
-		self.calcNumJobs(self.ctr)			
-		self.saveArrivals(J)
+		self.calcNumJobs(self.ctr)
+		self.saveNumJobs(MachineClass.CurrentTime, MachineClass.AvgNumJobs, load, percErrorMin, percErrorMax)
+		self.saveArrivals(J, load, percErrorMin, percErrorMax)
 		self.processJobs()				# process first job in queue	
 
 		# Generate next arrival
@@ -903,9 +918,9 @@ class MachineClass(object):
 				self.removeFirstQueued()
 
 	# Job completed
-	def completionEvent(self, completingJob):
+	def completionEvent(self, completingJob, load, percErrorMin, percErrorMax):
 		completingJob.completionTime = MachineClass.CurrentTime
-		self.saveJobs(completingJob)			# save to list of arrivals, for testing
+		self.saveJobs(completingJob, load, percErrorMin, percErrorMax)			# save to list of arrivals, for testing
 
 		# Server no longer busy
 		serverIndex = MachineClass.ProcessingJobs.index(completingJob)
@@ -949,7 +964,7 @@ class MachineClass(object):
 			else:
 				completingJob = minProcJob
 				MachineClass.CurrentTime += completingJob.RPT
-				self.completionEvent(completingJob)
+				self.completionEvent(completingJob, load, percErrorMin, percErrorMax)
 
 				if(MachineClass.Queue.Size > 0):
 					self.processJobs()
