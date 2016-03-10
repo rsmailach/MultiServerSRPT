@@ -11,18 +11,10 @@
 
 from Tkinter import *
 from datetime import datetime
-from math import log
-import plotly.plotly as py
-from plotly.graph_objs import Scatter
-import plotly.graph_objs as go
-#from scipy import integrate as integrate
-import copy
 import random
 import tkMessageBox
 import ttk
 import tkFileDialog
-import csv
-import operator
 
 NumJobs = []
 NumJobsTime = []
@@ -107,10 +99,20 @@ class GUI(Tk):
 
 			file.close()
 
-	# Empty arrivals file at the begining of each simulation
+	# Empty old saves at the begining of each simulation
+	def clearSavedJobs(self):
+		with open("Jobs.xls", "w") as myFile:
+			myFile.write('Job Name,Completion Time' + '\n')
+			myFile.close()
+
 	def clearSavedArrivals(self):
-		with open("Arrivals.txt", "w") as myFile:
-			myFile.write('Job Name,      Arrival Time,      RPT,       ERPT' + '\n')
+		with open("Arrivals.xls", "w") as myFile:
+			myFile.write('Job Name,Arrival Time,RPT,ERPT' + '\n')
+			myFile.close()
+
+	def clearSavedNumJobs(self):
+		with open("AvgNumberOfJobs.xls", "w") as myFile:
+			myFile.write('Current Time, Average Number Of Jobs, Current Number Of Jobs' + '\n')
 			myFile.close()
 
 	def clearConsole(self, event):
@@ -134,33 +136,6 @@ class GUI(Tk):
 		self.writeToConsole("Processing Rate = %.4f, Processing Distribution = %s"%(procRate, str(procDist)))
 		self.writeToConsole("% Error  = " + u"\u00B1" + " %.4f, %.4f"%(percErrorMin, percErrorMax))
 		self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
-
-	def plotNumJobsInSys(self):
-		py.sign_in('mailacrs','wowbsbc0qo')
-		trace0 = Scatter(x=NumJobsTime, y=NumJobs)
-		data = [trace0]
-		layout = go.Layout(
-			title='Average Number of Jobs Over Time',
-			xaxis=dict(
-				title='Time',
-				titlefont=dict(
-				family='Courier New, monospace',
-				size=18,
-				color='#7f7f7f'
-			)
-		),
-			yaxis=dict(
-				title='Number of Jobs',
-				titlefont=dict(
-				family='Courier New, monospace',
-				size=18,
-				color='#7f7f7f'
-			)
-		)
-		)
-		fig = go.Figure(data=data, layout=layout)
-		unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys: Case1')
-
 
 	def calcVariance(self, List, avg):
 		var = 0
@@ -190,7 +165,9 @@ class GUI(Tk):
 
 	def submit(self, event):
 		self.updateStatusBar("Simulating...")
+		self.clearSavedJobs()
 		self.clearSavedArrivals()
+		self.clearSavedNumJobs()
 		I = Input(self)
 
 		# Set global variable for num servers to value inputed
@@ -217,7 +194,7 @@ class GUI(Tk):
 				I.valuesList[4],				# error max
 				I.valuesList[5])				# sim time
 
-		#self.displayAverageData()
+		self.displayAverageData()
 		#self.saveData()
 		self.updateStatusBar("Simulation complete.")
 
@@ -817,10 +794,16 @@ class MachineClass(object):
 				MachineClass.ProcessingJobs[index].ERPT -= serviceTime
 
 	def calcNumJobs(self, jobID):
-		if(MachineClass.ServerBusy == True):
-			self.currentNumJobs = MachineClass.Queue.Size + 1
-		else:
-			self.currentNumJobs = MachineClass.Queue.Size
+		self.currentNumJobs = 0
+
+		# First add all jobs that are currently being processed
+		for i in range(NUM_SERVERS):
+			if(MachineClass.ServersBusy[i] == True):
+				self.currentNumJobs += 1
+
+		# Secondly, add all jobs in queue
+		self.currentNumJobs += MachineClass.Queue.Size
+		
 
 		changeInJobs = MachineClass.PrevNumJobs - self.currentNumJobs
 		self.t = MachineClass.CurrentTime
@@ -838,8 +821,31 @@ class MachineClass(object):
 		# PrevNum jobs becomes current num jobs
 		MachineClass.PrevNumJobs = self.currentNumJobs
 
-		NumJobs.append(MachineClass.AvgNumJobs)			# y axis of plot
-		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
+		#NumJobs.append(MachineClass.AvgNumJobs)			# y axis of plot
+		#NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
+
+		self.saveNumJobs(MachineClass.CurrentTime, self.currentNumJobs, MachineClass.AvgNumJobs)
+
+	def saveNumJobs(self, currentTime, avgNumJobs, currentNumJobs):
+		text = "%.6f,%s,%.6f"%(currentTime, avgNumJobs, currentNumJobs) + "\n"
+		
+		with open("AvgNumberOfJobs.xls", "a") as myFile:
+			myFile.write(text)
+		myFile.close()		
+
+	def saveArrivals(self, job):
+		text = "%s,%.6f,%.6f,%.6f"%(job.name, job.arrivalTime, job.RPT, job.ERPT) + "\n"
+		
+		with open("Arrivals.xls", "a") as myFile:
+			myFile.write(text)
+		myFile.close()		
+
+	def saveJobs(self, job):
+		text = "%s,%.6f"%(job.name, job.completionTime) + "\n"
+		
+		with open("Jobs.xls", "a") as myFile:
+			myFile.write(text)
+		myFile.close()				
 
 	# Job arriving
 	def arrivalEvent(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax):
@@ -848,10 +854,8 @@ class MachineClass(object):
 		J.name = "Job%02d"%self.ctr
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))	
-
-		#self.calcNumJobs(self.ctr)
-
 		self.updateJobs()				# update all processing jobs
+	
 
 		# Find longest RPT of all processing jobs
 		try:				
@@ -877,18 +881,13 @@ class MachineClass(object):
 			maxProcJob = None			
 
 		MachineClass.Queue.insert(J)	# add job to queue
+		self.calcNumJobs(self.ctr)			
+		self.saveArrivals(J)
 		self.processJobs()				# process first job in queue	
 
 		# Generate next arrival
 		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, arrDist)
 		self.ctr += 1
-
-	def saveArrivals(self, job):
-		text = "%s,%.6f,%.6f,%.6f,%.6f"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.completionTime) + "\n"
-		
-		with open("Jobs.txt", "a") as myFile:
-			myFile.write(text)
-		myFile.close()
 
 	# Processing first job in queue
 	def processJobs(self):
@@ -906,7 +905,7 @@ class MachineClass(object):
 	# Job completed
 	def completionEvent(self, completingJob):
 		completingJob.completionTime = MachineClass.CurrentTime
-		self.saveArrivals(completingJob)			# save to list of arrivals, for testing
+		self.saveJobs(completingJob)			# save to list of arrivals, for testing
 
 		# Server no longer busy
 		serverIndex = MachineClass.ProcessingJobs.index(completingJob)
@@ -915,9 +914,7 @@ class MachineClass(object):
 		MachineClass.ServiceStartTimes[serverIndex] = None
 
 		#MachineClass.JobOrderOut.append(completingJob.name)
-		#self.calcNumJobs(self.ctr)
-#		NumJobs.append(MachineClass.AvgNumJobs)			# y axis of plot
-#		NumJobsTime.append(MachineClass.CurrentTime)	# x axis of plot
+		self.calcNumJobs(self.ctr)
 		TimeSys.append(MachineClass.CurrentTime - completingJob.arrivalTime)
 		ProcTime.append(completingJob.procTime)
 		PercError.append(abs(completingJob.percentError))
