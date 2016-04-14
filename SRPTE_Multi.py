@@ -11,6 +11,9 @@
 
 from Tkinter import *
 from datetime import datetime
+#import plotly.plotly as py
+#from plotly.graph_objs import Scatter
+#import plotly.graph_objs as go
 import random
 import tkMessageBox
 import ttk
@@ -172,7 +175,6 @@ class GUI(Tk):
 		return var/len(List)
 
 	def displayAverageData(self):
-		#self.plotNumJobsInSys()
 		##AvgNumJobs = int(float(sum(NumJobs))/len(NumJobs))
 		AvgNumJobs = MachineClass.AvgNumJobs
 		AvgTimeSys = float(sum(TimeSys))/len(TimeSys)
@@ -187,6 +189,43 @@ class GUI(Tk):
 		self.writeToConsole('Average percent error %.4f\n' %AvgPercError)
 		#self.writeToConsole('Request order: %s' % ArrivalClass.JobOrderIn)
 		#self.writeToConsole('Service order: %s\n\n' % MachineClass.JobOrderOut)
+
+	# def plotNumJobsInSys(self, load, errorMin, errorMax):
+	# 	py.sign_in('mailacrs','wowbsbc0qo')
+
+
+	# 	if (abs(errorMin) == errorMax):
+	# 		self.error = str(int(errorMax))
+	# 	else:
+	# 		self.error = str(int(errorMin)) + "_" + str(int(errorMax))
+
+	# 	self.name = "NumJobs_numServers=%s_load=%s_alpha=%s_error=%s"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error)
+	# 	params = pandas.read_csv(self.name)
+
+	# 	trace0 = Scatter(x=params["NumJobsTime"], y=params["NumJobs"])
+	# 	data = [trace0]
+	# 	layout = go.Layout(
+	# 		title='Average Number of Jobs Over Time',
+	# 		xaxis=dict(
+	# 			title='Time',
+	# 			titlefont=dict(
+	# 			family='Courier New, monospace',
+	# 			size=18,
+	# 			color='#7f7f7f'
+	# 		)
+	# 	),
+	# 		yaxis=dict(
+	# 			title='Number of Jobs',
+	# 			titlefont=dict(
+	# 			family='Courier New, monospace',
+	# 			size=18,
+	# 			color='#7f7f7f'
+	# 		)
+	# 	)
+	# 	)
+	# 	fig = go.Figure(data=data, layout=layout)
+	# 	unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys: '+ str(self.name))
+
 
 	def stopSimulation(self, event):
 		MachineClass.StopSim = True
@@ -241,6 +280,7 @@ class GUI(Tk):
 
 
 		self.displayAverageData()
+		#self.plotNumJobsInSys(I.valuesList[1], I.valuesList[4], I.valuesList[5])
 		#self.saveData()
 		self.updateStatusBar("Simulation complete.")
 
@@ -877,17 +917,17 @@ class MachineClass(object):
 		# PrevNum jobs becomes current num jobs
 		MachineClass.PrevNumJobs = self.currentNumJobs
 
-	#def saveNumJobs(self, currentTime, avgNumJobs, load, errorMin, errorMax):
-	#	text = "%.6f,%.6f"%(currentTime, avgNumJobs) + "\n"
+	def saveNumJobs(self, currentTime, avgNumJobs, load, errorMin, errorMax):
+		text = "%.6f,%.6f"%(currentTime, avgNumJobs) + "\n"
 
-	#	if (abs(errorMin) == errorMax):
-	#		self.error = str(int(errorMax))
-	#	else:
-	#		self.error = str(int(errorMin)) + "_" + str(int(errorMax))
+		if (abs(errorMin) == errorMax):
+			self.error = str(int(errorMax))
+		else:
+			self.error = str(int(errorMin)) + "_" + str(int(errorMax))
 		
-	#	with open("NumJobs_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
-	#		myFile.write(text)
-	#	myFile.close()		
+		with open("NumJobs_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
+			myFile.write(text)
+		myFile.close()		
 
 	#def saveArrivals(self, job, load, errorMin, errorMax):
 	#	text = "%s,%.6f,%.6f,%.6f"%(job.name, job.arrivalTime, job.RPT, job.ERPT) + "\n"
