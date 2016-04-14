@@ -15,6 +15,10 @@ import random
 import tkMessageBox
 import ttk
 import tkFileDialog
+import sqlite3
+import pandas
+
+conn=sqlite3.connect('MultiServerDatabase.db')
 
 NumJobs = []
 NumJobsTime = []
@@ -22,8 +26,6 @@ TimeSys = []
 ProcTime = []
 PercError = []
 NUM_SERVERS = 0
-
-
 
 #----------------------------------------------------------------------#
 # Class: GUI
@@ -36,7 +38,9 @@ class GUI(Tk):
 		Tk.__init__(self, master)
 		self.master = master        # reference to parent
 		self.statusText = StringVar()
-		random.seed(datetime.now())
+		global SEED
+		SEED = datetime.now() 
+		random.seed(SEED)
 
 		# Create the input frame
 		self.frameIn = Input(self)
@@ -128,7 +132,29 @@ class GUI(Tk):
 	def printIntro(self):
 		self.writeToConsole("SRPTE \n\n This application simulates a single server with Poisson arrivals and processing times of a general distribution. Each arrival has an estimation error within a percent error taken as input. Jobs are serviced in order of shortest remaining processing time.")
 
-	def printParams(self, numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, simLength): 
+	def saveParams(self, numServers, load, arrRate, arrDist, procRate, procDist, percErrorMin, percErrorMax, simLength, alpha, lower, upper):
+		##params = pandas.DataFrame(columns=('seed', 'numServers', 'load', 'arrRate', 'arrDist', 'procRate', 'procDist', 'alpha', 'lower', 'upper', 'percErrorMin', 'percErrorMax', 'simLength'))
+		print SEED
+		params = pandas.DataFrame({	'seed' : [SEED],
+									'numServers' : [numServers],
+									'load' : [load],
+									'arrRate' : [arrRate],
+									'arrDist' : [arrDist],
+									'procRate' : [procRate],
+									'procDist' : [procDist],
+									'alpha' : [alpha],
+									'lower' : [lower],
+									'upper' : [upper],
+									'percErrorMin' : [percErrorMin],
+									'percErrorMax' : [percErrorMax],
+									'simLength' : [simLength],
+									'avgNumJobs' : [MachineClass.AvgNumJobs]
+									})
+
+		params.to_sql(name='parameters', con=conn, if_exists='append')
+		print params
+
+	def printParams(self, numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, simLength):
 		self.writeToConsole("--------------------------------------------------------------------------------")
 		self.writeToConsole("PARAMETERS:")
 		self.writeToConsole("Number of Servers = %s"%numServers)
@@ -178,11 +204,12 @@ class GUI(Tk):
 
 		self.printParams(I.valuesList[0],					#num Servers
 						 I.valuesList[1],					#load
+						 #I.valuesList[2],					# arrival rate
 						 'Exponential',						#arrival
-						 I.valuesList[2], I.distList[1],	#processing rate
-						 I.valuesList[3], 					#error min
-						 I.valuesList[4],					#error max 
-						 I.valuesList[5])					#sim time
+						 I.valuesList[3], I.distList[1],	#processing rate
+						 I.valuesList[4], 					#error min
+						 I.valuesList[5],					#error max 
+						 I.valuesList[6])					#sim time
 
 		main.timesClicked = 0
 		
@@ -190,11 +217,28 @@ class GUI(Tk):
 		MC = MachineClass(self)
 		MC.run(	#I.valuesList[0],					#num Servers
 				I.valuesList[1],					#load
-				'Exponential',					# arrival
-				I.valuesList[2], I.distList[1],	# processing
-				I.valuesList[3], 				# error min
-				I.valuesList[4],				# error max
-				I.valuesList[5])				# sim time
+				#I.valuesList[2],					# arrival rate
+				'Exponential',						# arrival
+				I.valuesList[3], I.distList[1],		# processing
+				I.valuesList[4], 					# error min
+				I.valuesList[5],					# error max
+				I.valuesList[6])					# sim time
+
+		self.saveParams(I.valuesList[0],				#num Servers
+						I.valuesList[1],				#load
+						I.valuesList[2],							# arrival rate
+						'Exponential',					# arrival dist
+						I.valuesList[3], I.distList[1],	# processing
+						I.valuesList[4], 				# error min
+						I.valuesList[5],				# error max
+						I.valuesList[6],				# sim time
+						JobClass.BPArray[0],			# alpha
+						JobClass.BPArray[1],			# lower
+						JobClass.BPArray[2])			# upper
+
+
+
+
 
 		self.displayAverageData()
 		#self.saveData()
@@ -327,30 +371,40 @@ class Input(LabelFrame):
 		try:
 			numberOfServers = self.numServersInput.get()
 			load = self.loadInput.get()
-			#arrivalRate = self.arrivalRateInput.get()
-			processingRate = self.processingRateInput.get()
 			percentErrorMin = self.percentErrorMinInput.get()
 			percentErrorMax = self.percentErrorMaxInput.get()
 			maxSimLength = self.simLengthInput.get()
 		except ValueError:
-				self.errorMessage.set("One of your inputs is an incorrect type, try again.")
-				return 1
+			self.errorMessage.set("One of your inputs is an incorrect type, try again.")
+			return 1
+
+		try:
+			arrRate = float(self.arrivalRateInput.get())
+		except ValueError:
+			arrRate = 0.0
+		try:
+			procRate = float(self.processingRateInput.get())
+		except ValueError:
+			procRate = 0.0
 
 		if load <= 0.0:
 			self.errorMessage.set("System load must be a non-zero value!")
 			return 1
-		#if arrivalRate <= 0.0:
+		#if arrRate <= 0.0:
 		#	self.errorMessage.set("Arrival rate must be a non-zero value!")
 		#	return 1
-		if processingRate <= 0.0:
-			self.errorMessage.set("Processing rate must be a non-zero value!")
-			return 1
+		#if procRate != None and processingRate <= 0.0:
+		#	self.errorMessage.set("Processing rate must be a non-zero value!")
+		#	return 1
+
+
+
 		if maxSimLength <= 0.0:
 			self.errorMessage.set("Simulation length must be a non-zero value!")
 			return 1
 		else:
 			self.errorMessage.set("")
-			Input.valuesList = [numberOfServers, load, processingRate, percentErrorMin, percentErrorMax, maxSimLength]
+			Input.valuesList = [numberOfServers, load, arrRate, procRate, percentErrorMin, percentErrorMax, maxSimLength]
 			return 0
 
 	def getDropDownValues(self):
@@ -823,43 +877,41 @@ class MachineClass(object):
 		# PrevNum jobs becomes current num jobs
 		MachineClass.PrevNumJobs = self.currentNumJobs
 
+	#def saveNumJobs(self, currentTime, avgNumJobs, load, errorMin, errorMax):
+	#	text = "%.6f,%.6f"%(currentTime, avgNumJobs) + "\n"
+
+	#	if (abs(errorMin) == errorMax):
+	#		self.error = str(int(errorMax))
+	#	else:
+	#		self.error = str(int(errorMin)) + "_" + str(int(errorMax))
 		
+	#	with open("NumJobs_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
+	#		myFile.write(text)
+	#	myFile.close()		
 
-	def saveNumJobs(self, currentTime, avgNumJobs, load, errorMin, errorMax):
-		text = "%.6f,%.6f"%(currentTime, avgNumJobs) + "\n"
+	#def saveArrivals(self, job, load, errorMin, errorMax):
+	#	text = "%s,%.6f,%.6f,%.6f"%(job.name, job.arrivalTime, job.RPT, job.ERPT) + "\n"
+	#
+	#	if (abs(errorMin) == errorMax):
+	#		self.error = str(int(errorMax))
+	#	else:
+	#		self.error = str(int(errorMin)) + "_" + str(int(errorMax))	
+	#	
+	#	with open("Arrivals_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
+	#		myFile.write(text)
+	#	myFile.close()		
 
-		if (abs(errorMin) == errorMax):
-			self.error = str(int(errorMax))
-		else:
-			self.error = str(int(errorMin)) + "_" + str(int(errorMax))
-		
-		with open("NumJobs_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
-			myFile.write(text)
-		myFile.close()		
+	#def saveJobs(self, job, load, errorMin, errorMax):
+	#	text = "%s,%.6f"%(job.name, job.completionTime) + "\n"
+	#
+	#	if (abs(errorMin) == errorMax):
+	#		self.error = str(int(errorMax))
+	#	else:
+	#		self.error = str(int(errorMin)) + "_" + str(int(errorMax))
 
-	def saveArrivals(self, job, load, errorMin, errorMax):
-		text = "%s,%.6f,%.6f,%.6f"%(job.name, job.arrivalTime, job.RPT, job.ERPT) + "\n"
-
-		if (abs(errorMin) == errorMax):
-			self.error = str(int(errorMax))
-		else:
-			self.error = str(int(errorMin)) + "_" + str(int(errorMax))	
-		
-		with open("Arrivals_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
-			myFile.write(text)
-		myFile.close()		
-
-	def saveJobs(self, job, load, errorMin, errorMax):
-		text = "%s,%.6f"%(job.name, job.completionTime) + "\n"
-
-		if (abs(errorMin) == errorMax):
-			self.error = str(int(errorMax))
-		else:
-			self.error = str(int(errorMin)) + "_" + str(int(errorMax))
-
-		with open("Jobs_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
-			myFile.write(text)
-		myFile.close()				
+	#	with open("Jobs_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
+	#		myFile.write(text)
+	#	myFile.close()				
 
 	# Job arriving
 	def arrivalEvent(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax):
@@ -895,9 +947,9 @@ class MachineClass(object):
 			maxProcJob = None			
 
 		MachineClass.Queue.insert(J)	# add job to queue
-		self.calcNumJobs(self.ctr)
-		self.saveNumJobs(MachineClass.CurrentTime, MachineClass.AvgNumJobs, load, percErrorMin, percErrorMax)
-		self.saveArrivals(J, load, percErrorMin, percErrorMax)
+		#self.calcNumJobs(self.ctr)
+		#self.saveNumJobs(MachineClass.CurrentTime, MachineClass.AvgNumJobs, load, percErrorMin, percErrorMax)
+		#self.saveArrivals(J, load, percErrorMin, percErrorMax)
 		self.processJobs()				# process first job in queue	
 
 		# Generate next arrival
@@ -920,7 +972,7 @@ class MachineClass(object):
 	# Job completed
 	def completionEvent(self, completingJob, load, percErrorMin, percErrorMax):
 		completingJob.completionTime = MachineClass.CurrentTime
-		self.saveJobs(completingJob, load, percErrorMin, percErrorMax)			# save to list of arrivals, for testing
+		#self.saveJobs(completingJob, load, percErrorMin, percErrorMax)			# save to list of arrivals, for testing
 
 		# Server no longer busy
 		serverIndex = MachineClass.ProcessingJobs.index(completingJob)
