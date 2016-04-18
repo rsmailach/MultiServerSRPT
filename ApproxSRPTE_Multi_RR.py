@@ -712,6 +712,7 @@ class LinkedList(object):
 
 		LinkedList.Size += 1
 
+	#Insert to queue and sort by ERPT
 	def insertByERPT(self, job, numClasses):
 		current = self.head		# node iterator, starts at head
 		previous = None
@@ -730,6 +731,7 @@ class LinkedList(object):
 
 		LinkedList.Size += 1	
 
+	#Insert to queue and sort by LCFS
 	def insertByLCFS(self, job, numClasses):
 		current = self.head		# node iterator, starts at head
 		previous = None
@@ -1001,7 +1003,7 @@ class MachineClass(object):
 	def assignClass(self, numClasses, job, prevJobs, counterStart, counter):
 		# Remove oldest job from previous jobs list if there are too many
 		while len(prevJobs) > (numClasses - 1):
-			print "prev jobs too long"
+			#print "prev jobs too long"
 			prevJobs.pop(0)
 
 		# Sort previous current job with previous jobs
@@ -1027,25 +1029,33 @@ class MachineClass(object):
 		servers = cycle(range(0, NUM_SERVERS))
 		if(self.ctr == 0):
 			MachineClass.LastRoutedTo = [0] * numClasses
-			
 
 			for item in range(len(MachineClass.LastRoutedTo)):
-				MachineClass.LastRoutedTo[item] = next(servers)		# List of last server jobs sent to from each class
-																	# Starts with each class routing to a different server
-																	# Class 0 routes to server 0, class 1 routes to server 1...
-			self.sendJobToServer(job, 0, numClasses)	#First job is always Class 0, so update for next arrival																
-			MachineClass.LastRoutedTo[0] += 1
-			print MachineClass.LastRoutedTo
+				MachineClass.LastRoutedTo[item] = next(servers)			# List of last server jobs sent to from each class
+																		# Starts with each class routing to a different server
+																		# Class 0 routes to server 0, class 1 routes to server 1...
+			self.sendJobToServer(job, 0, numClasses)					#First job is always Class 0, so update for next arrival																
+			MachineClass.LastRoutedTo[0] = 0
+			
+			# Return server id job is routed to
+			return 0
+
 		else:
 			# For each priority class, if the incoming job matches the iterator, 
 			for index in range(len(MachineClass.LastRoutedTo)):
 				if (job.priorityClass == index):
-					self.sendJobToServer(job, MachineClass.LastRoutedTo[index], numClasses)
 					MachineClass.LastRoutedTo[index] += 1						# Update where we have routed to so as to go to next server next time.
+			
 					if(MachineClass.LastRoutedTo[index] > (NUM_SERVERS-1)):		# Reset after full loop of servers
 						MachineClass.LastRoutedTo[index] = 0
+
+					#Send job to the next server
+					self.sendJobToServer(job, MachineClass.LastRoutedTo[index], numClasses)		
+
+					# Return server id job is routed to
+					return index
 					
-			print MachineClass.LastRoutedTo		
+
 
 	# Send job to server i
 	def sendJobToServer(self, job, i, numClasses):
@@ -1056,52 +1066,89 @@ class MachineClass(object):
 			MachineClass.ServerQueues[i].insertByLCFS(job, numClasses);
 
 		else:
-			# Add current job with new class to queue
+			# Add current job with new class to queue 
 			MachineClass.ServerQueues[i].insertByClass(job)				# add job to queue
 		
 		# Print queue
-		#print MachineClass.CurrentTime
-		#MachineClass.ServerQueues[i].printList(i)
+		print "\n\n" + str(MachineClass.CurrentTime)
+		print MachineClass.LastRoutedTo
+		MachineClass.ServerQueues[i].printList(i)
 
 
-	# def calcNumJobs(self, jobID):
-	# 	self.currentNumJobs = MachineClass.Queue.Size
-	# 	self.t = MachineClass.CurrentTime
-	# 	self.delta_t = self.t - MachineClass.PrevTime 
+	def calcNumJobs(self, jobID):
+		self.currentNumJobs = MachineClass.Queue.Size
+		self.t = MachineClass.CurrentTime
+		self.delta_t = self.t - MachineClass.PrevTime 
 
-	# 	# If one job in system
-	# 	if(jobID == 0):
-	# 		MachineClass.AvgNumJobs = 1 # First event is always create new job
-	# 	# UPDATE 
-	# 	else:
-	# 		MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) + float(MachineClass.PrevNumJobs)*(float(self.delta_t)/self.t)
+		# If one job in system
+		if(jobID == 0):
+			MachineClass.AvgNumJobs = 1 # First event is always create new job
+		# UPDATE 
+		else:
+			MachineClass.AvgNumJobs = (MachineClass.PrevTime/(self.t))*float(MachineClass.AvgNumJobs) + float(MachineClass.PrevNumJobs)*(float(self.delta_t)/self.t)
 			
-	# 	# PrevTime becomes "old" t
-	# 	MachineClass.PrevTime = self.t 
-	# 	# PrevNum jobs becomes current num jobs
-	# 	MachineClass.PrevNumJobs = self.currentNumJobs
+		# PrevTime becomes "old" t
+		MachineClass.PrevTime = self.t 
+		# PrevNum jobs becomes current num jobs
+		MachineClass.PrevNumJobs = self.currentNumJobs
 
 
-	# def calcNumJobsPerClass(self, numClasses):
-	# 	numJobsArray = list(MachineClass.Queue.countClassesQueued(numClasses))
+	def calcNumJobsPerClass(self, numClasses):
+		numJobsArray = list(MachineClass.Queue.countClassesQueued(numClasses))
 
-	# 	self.t = MachineClass.CurrentTime 
-	# 	self.delta_t = self.t - MachineClass.PrevTimeA
+		self.t = MachineClass.CurrentTime 
+		self.delta_t = self.t - MachineClass.PrevTimeA
 
-	# 	for i in range(0, numClasses):
-	# 		# If one job in system
-	# 		if(MachineClass.counter == 0):
-	# 			MachineClass.PrevNumJobsArray = [0] * (numClasses) 			# creates array of size (numClasses + 1) filled with 0s
-	# 			MachineClass.AvgNumJobsArray = list(numJobsArray)			# First event is always create new job
-	# 			MachineClass.counter = 1
-	# 		# UPDATE 
-	# 		else:
-	# 			MachineClass.AvgNumJobsArray[i] = (float(MachineClass.PrevTimeA)/self.t)*float(MachineClass.AvgNumJobsArray[i]) + float(MachineClass.PrevNumJobsArray[i])*(float(self.delta_t)/self.t)
+		for i in range(0, numClasses):
+			# If one job in system
+			if(MachineClass.counter == 0):
+				MachineClass.PrevNumJobsArray = [0] * (numClasses) 			# creates array of size (numClasses + 1) filled with 0s
+				MachineClass.AvgNumJobsArray = list(numJobsArray)			# First event is always create new job
+				MachineClass.counter = 1
+			# UPDATE 
+			else:
+				MachineClass.AvgNumJobsArray[i] = (float(MachineClass.PrevTimeA)/self.t)*float(MachineClass.AvgNumJobsArray[i]) + float(MachineClass.PrevNumJobsArray[i])*(float(self.delta_t)/self.t)
 									
-	# 	# PrevTime becomes "old" t (set in regular caclulation)
-	# 	MachineClass.PrevTimeA = self.t 
-	# 	# PrevNum jobs becomes current num jobs
-	# 	MachineClass.PrevNumJobsArray = list(numJobsArray)
+		# PrevTime becomes "old" t (set in regular caclulation)
+		MachineClass.PrevTimeA = self.t 
+		# PrevNum jobs becomes current num jobs
+		MachineClass.PrevNumJobsArray = list(numJobsArray)
+
+	def saveNumJobs(self, currentTime, avgNumJobs, load, errorMin, errorMax):
+		text = "%.6f,%.6f"%(currentTime, avgNumJobs) + "\n"
+
+		if (abs(errorMin) == errorMax):
+			self.error = str(int(errorMax))
+		else:
+			self.error = str(int(errorMin)) + "_" + str(int(errorMax))
+		
+		with open("NumJobs_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
+			myFile.write(text)
+		myFile.close()		
+
+	def saveArrivals(self, job, load, errorMin, errorMax):
+		text = "%s,%.6f,%.6f,%.6f,%s"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.priorityClass) + "\n"
+	
+		if (abs(errorMin) == errorMax):
+			self.error = str(int(errorMax))
+		else:
+			self.error = str(int(errorMin)) + "_" + str(int(errorMax))	
+		
+		with open("Arrivals_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
+			myFile.write(text)
+		myFile.close()		
+
+	def saveJobs(self, job, load, errorMin, errorMax):
+		text = "%s,%.6f"%(job.name, job.completionTime) + "\n"
+	
+		if (abs(errorMin) == errorMax):
+			self.error = str(int(errorMax))
+		else:
+			self.error = str(int(errorMin)) + "_" + str(int(errorMax))
+
+		with open("Jobs_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
+			myFile.write(text)
+		myFile.close()		
 
 	# Job arriving
 	def arrivalEvent(self, load, arrDist, procRate, procDist, numClasses, percErrorMin, percErrorMax):
@@ -1114,11 +1161,38 @@ class MachineClass(object):
 		#self.calcNumJobsPerClass(numClasses)
 
 		self.assignClass(numClasses, J, MachineClass.PreviousJobs, 0, 0)	# Give job a class, and add to queue
-		self.router(J, numClasses)											# Send job to a server queue
+		serverIndex = self.router(J, numClasses)							# Send job to a server queue
+
+		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass))		
 
 		self.updateJobs()		# update all processing jobs
 
-		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass))
+		
+		print "processing %s at server %s"%(J.name, serverIndex)
+		procJob = MachineClass.ProcessingJobs[serverIndex]
+
+		# Preempt processing job at server if arriving job is smaller
+		if (procJob != None):
+			if (J.ERPT < procJob.ERPT):
+				GUI.writeToConsole(self.master, "%.6f | %s preempting %s"%(MachineClass.CurrentTime, J.name, procJob.name))
+
+				#Remove procJob from processing
+				MachineClass.ServersBusy[serverIndex] = False
+				MachineClass.ProcessingJobs[serverIndex] = None
+				MachineClass.ServiceStartTimes[serverIndex] = None
+
+				# Add preempted job back to queue
+				# If job is in the last class, sort by LCFS
+				if (procJob.priorityClass == numClasses):
+					MachineClass.ServerQueues[serverIndex].insertByLCFS(procJob, numClasses);
+
+				else:
+					# Add current job with new class to queue 
+					MachineClass.ServerQueues[serverIndex].insertByClass(procJob)				# add job to queue
+					GUI.writeToConsole(self.master, "%.6f | %s added back to queue, ERPT = %.5f"%(MachineClass.CurrentTime, procJob.name, procJob.ERPT))
+
+		self.saveNumJobs(MachineClass.CurrentTime, MachineClass.AvgNumJobs, load, percErrorMin, percErrorMax)
+		self.saveArrivals(J, load, percErrorMin, percErrorMax)
 		self.processJobs()		# process first job in each queue
 
 		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, arrDist)
@@ -1139,9 +1213,9 @@ class MachineClass(object):
 				MachineClass.ServerQueues[i].removeHead()
 
 	# Job completed
-	def completionEvent(self, numClasses, completingJob):
+	def completionEvent(self, numClasses, completingJob, load, percErrorMin, percErrorMax):
 		completingJob.completionTime = MachineClass.CurrentTime
-		self.saveArrivals(completingJob)							# Save to list of arrivals, for testing
+		self.saveJobs(completingJob, load, percErrorMin, percErrorMax)			# save to list of arrivals, for testing
 
 		#self.calcNumJobs(self.ctr)
 		#self.calcNumJobsPerClass(numClasses)
@@ -1157,6 +1231,9 @@ class MachineClass(object):
 		PercError.append(abs(completingJob.percentError))
 
 		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, completingJob.name))
+
+		if (MachineClass.ServerQueues[serverIndex].Size > 0):
+			self.processJobs()
 
 
 	def run(self, numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, numClasses, simLength):
@@ -1189,9 +1266,7 @@ class MachineClass(object):
 			else:
 				completingJob = minProcJob
 				MachineClass.CurrentTime += completingJob.RPT
-				self.completionEvent(numClasses, completingJob)
-
-				self.processJobs()
+				self.completionEvent(numClasses, completingJob, load, percErrorMin, percErrorMax)
 
 			# If current time is greater than the simulation length, end program
 			if (MachineClass.CurrentTime > simLength) or (MachineClass.StopSim == True):
