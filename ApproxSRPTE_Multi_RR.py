@@ -916,7 +916,7 @@ class MachineClass(object):
 	ProcessingJobs = [None] * NUM_SERVERS		# Array of current job in each server
 	ServersBusy = [False] * NUM_SERVERS			# Array of whether each server is busy	
 
-	LastRoutedTo = []
+	NextRoutedTo = []
 
 	PrevTime = 0
 	PrevTimeA = 0
@@ -946,7 +946,7 @@ class MachineClass(object):
 		MachineClass.ProcessingJobs = [None] * NUM_SERVERS
 		MachineClass.ServersBusy = [False] * NUM_SERVERS
 
-		MachineClass.LastRoutedTo[:] = []
+		MachineClass.NextRoutedTo[:] = []
 
 
 		MachineClass.PrevTime = 0
@@ -1028,32 +1028,36 @@ class MachineClass(object):
 		# Set up last routed to once
 		servers = cycle(range(0, NUM_SERVERS))
 		if(self.ctr == 0):
-			MachineClass.LastRoutedTo = [0] * numClasses
+			MachineClass.NextRoutedTo = [0] * numClasses
 
-			for item in range(len(MachineClass.LastRoutedTo)):
-				MachineClass.LastRoutedTo[item] = next(servers)			# List of last server jobs sent to from each class
+			for item in range(len(MachineClass.NextRoutedTo)):
+				MachineClass.NextRoutedTo[item] = next(servers)			# List of last server jobs sent to from each class
 																		# Starts with each class routing to a different server
 																		# Class 0 routes to server 0, class 1 routes to server 1...
 			self.sendJobToServer(job, 0, numClasses)					#First job is always Class 0, so update for next arrival																
-			MachineClass.LastRoutedTo[0] = 0
+			MachineClass.NextRoutedTo[0] += 1
 			
 			# Return server id job is routed to
 			return 0
 
 		else:
 			# For each priority class, if the incoming job matches the iterator, 
-			for index in range(len(MachineClass.LastRoutedTo)):
+			for index in range(len(MachineClass.NextRoutedTo)):
 				if (job.priorityClass == index):
-					MachineClass.LastRoutedTo[index] += 1						# Update where we have routed to so as to go to next server next time.
-			
-					if(MachineClass.LastRoutedTo[index] > (NUM_SERVERS-1)):		# Reset after full loop of servers
-						MachineClass.LastRoutedTo[index] = 0
-
 					#Send job to the next server
-					self.sendJobToServer(job, MachineClass.LastRoutedTo[index], numClasses)		
+					serverID = MachineClass.NextRoutedTo[index]
+					self.sendJobToServer(job, serverID, numClasses)
+					
 
+					MachineClass.NextRoutedTo[index] += 1						# Update where we have routed to so as to go to next server next time.
+			
+					if(MachineClass.NextRoutedTo[index] > (NUM_SERVERS-1)):		# Reset after full loop of servers
+						MachineClass.NextRoutedTo[index] = 0	
+
+					print "\n %s JOB IS SENT TO SERVER %s \n"%(MachineClass.CurrentTime, index)
 					# Return server id job is routed to
-					return index
+					return serverID
+					
 					
 
 
@@ -1071,7 +1075,7 @@ class MachineClass(object):
 		
 		# Print queue
 		print "\n\n" + str(MachineClass.CurrentTime)
-		print MachineClass.LastRoutedTo
+		print MachineClass.NextRoutedTo
 		MachineClass.ServerQueues[i].printList(i)
 
 
@@ -1163,7 +1167,7 @@ class MachineClass(object):
 		self.assignClass(numClasses, J, MachineClass.PreviousJobs, 0, 0)	# Give job a class, and add to queue
 		serverIndex = self.router(J, numClasses)							# Send job to a server queue
 
-		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass))		
+		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s, server = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass, serverIndex))		
 
 		self.updateJobs()		# update all processing jobs
 
@@ -1202,6 +1206,9 @@ class MachineClass(object):
 	def processJobs(self):
 		for i in range(NUM_SERVERS):
 			#Server i not busy and a job is waiting in the queue
+			print "size of queue %s is %s"%(i, MachineClass.ServerQueues[i].Size)
+
+
 			if (MachineClass.ServersBusy[i] == False) and (MachineClass.ServerQueues[i].Size > 0):
 				currentJob = MachineClass.ServerQueues[i].getHead().job
 				GUI.writeToConsole(self.master, "%s is first at server %s------------------------------------------"%(currentJob.name, i))
@@ -1230,7 +1237,7 @@ class MachineClass(object):
 		ProcTime.append(completingJob.procTime)
 		PercError.append(abs(completingJob.percentError))
 
-		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, completingJob.name))
+		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED at server %s"%(MachineClass.CurrentTime, completingJob.name, serverIndex))
 
 		if (MachineClass.ServerQueues[serverIndex].Size > 0):
 			self.processJobs()
