@@ -1042,19 +1042,19 @@ class MachineClass(object):
 
 		else:
 			# For each priority class, if the incoming job matches the iterator, 
-			for index in range(len(MachineClass.NextRoutedTo)):
-				if (job.priorityClass == index):
+			for priorityClass in range(len(MachineClass.NextRoutedTo)):
+				if (job.priorityClass == priorityClass):
 					#Send job to the next server
-					serverID = MachineClass.NextRoutedTo[index]
+					serverID = MachineClass.NextRoutedTo[priorityClass]
 					self.sendJobToServer(job, serverID, numClasses)
 					
 
-					MachineClass.NextRoutedTo[index] += 1						# Update where we have routed to so as to go to next server next time.
+					MachineClass.NextRoutedTo[priorityClass] += 1						# Update where we have routed to so as to go to next server next time.
 			
-					if(MachineClass.NextRoutedTo[index] > (NUM_SERVERS-1)):		# Reset after full loop of servers
-						MachineClass.NextRoutedTo[index] = 0	
+					if(MachineClass.NextRoutedTo[priorityClass] > (NUM_SERVERS-1)):		# Reset after full loop of servers
+						MachineClass.NextRoutedTo[priorityClass] = 0	
 
-					print "\n %s JOB IS SENT TO SERVER %s \n"%(MachineClass.CurrentTime, index)
+					print "\n JOB IS SENT TO SERVER %s \n"%(serverID)
 					# Return server id job is routed to
 					return serverID
 					
@@ -1074,8 +1074,8 @@ class MachineClass(object):
 			MachineClass.ServerQueues[i].insertByClass(job)				# add job to queue
 		
 		# Print queue
-		print "\n\n" + str(MachineClass.CurrentTime)
-		print MachineClass.NextRoutedTo
+
+		print "\n\n" + str(MachineClass.CurrentTime) + ":" + str(MachineClass.NextRoutedTo)
 		MachineClass.ServerQueues[i].printList(i)
 
 
@@ -1168,11 +1168,12 @@ class MachineClass(object):
 		serverIndex = self.router(J, numClasses)							# Send job to a server queue
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s, server = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass, serverIndex))		
-
+		
+		print "1processing %s at server %s"%(J.name, serverIndex)
 		self.updateJobs()		# update all processing jobs
 
 		
-		print "processing %s at server %s"%(J.name, serverIndex)
+		print "2processing %s at server %s"%(J.name, serverIndex)
 		procJob = MachineClass.ProcessingJobs[serverIndex]
 
 		# Preempt processing job at server if arriving job is smaller
