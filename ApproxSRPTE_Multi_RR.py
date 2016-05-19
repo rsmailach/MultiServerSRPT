@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------#
-# ApproxSRPTE_Multi.py
+# ApproxSRPTE_Multi_RR.py
 #
 # This application simulates multiple server with Poisson arrivals
 # and processing times of a general distribution. There are errors in
@@ -35,7 +35,7 @@ NumJobsTime = []
 TimeSys = []
 ProcTime = []
 PercError = []
-NUM_SERVERS = 0
+#NUM_SERVERS = 0
 
 #----------------------------------------------------------------------#
 # Class: GUI
@@ -333,7 +333,7 @@ class Input(LabelFrame):
 		self.comboboxVal = StringVar()
 
 		self.numServersInput.set(2)					##################################CHANGE LATER	
-		self.loadInput.set(0.7)       		 	   	##################################CHANGE LATER
+		self.loadInput.set(0.95)       		 	   	##################################CHANGE LATER
 		#self.arrivalRateInput.set(1.0)         	 ##################################CHANGE LATER
 		self.processingRateInput.set(0.5)   	    ##################################CHANGE LATER
 		self.percentErrorMinInput.set(0)          ##################################CHANGE LATER
@@ -683,15 +683,15 @@ class Node():
 #
 #----------------------------------------------------------------------#
 class LinkedList(object):
-	Size = 0
+	#Size = 0
 	NumJobArrayByClass = []
-	Count = 0
+	#Count = 0
 
 	def __init__(self, head = None):
 		self.head = head
 		LinkedList.NumJobArrayByClass[:] = []
 		LinkedList.Count = 0
-		LinkedList.Size = 0
+		self.Size = 0
 
 	# Insert job into queue (sorted by class, then name)
 	def insertByClass(self, job):
@@ -710,7 +710,8 @@ class LinkedList(object):
 			else:
 				previous.nextNode = Node(job, current)
 
-		LinkedList.Size += 1
+		self.Size += 1
+		print "ENQUEUE JOB"
 
 	#Insert to queue and sort by ERPT
 	def insertByERPT(self, job, numClasses):
@@ -729,7 +730,8 @@ class LinkedList(object):
 			else:
 				previous.nextNode = Node(job, current)
 
-		LinkedList.Size += 1	
+		self.Size += 1
+		print "ENQUEUE JOB"	
 
 	#Insert to queue and sort by LCFS
 	def insertByLCFS(self, job, numClasses):
@@ -748,29 +750,30 @@ class LinkedList(object):
 			else:
 				previous.nextNode = Node(job, current)
 
-		LinkedList.Size += 1		
+		self.Size += 1
+		print "ENQUEUE JOB"		
 
 	# Remove first item in queue
 	def removeHead(self):
-		if (LinkedList.Size > 0):
+		if (self.Size > 0):
 			self.head = self.head.nextNode		# move head forward one node
-			LinkedList.Size -= 1
+			self.Size -= 1
+			print "REMOVING HEAD"
 		else:
 			print "ERROR: The linked list is already empty!"
 
 	# Return first item in queue
 	def getHead(self):
-		if(LinkedList.Size > 0):
+		if(self.Size > 0):
 			return self.head
 
 	def clear(self):
-		LinkedList.Size = 0
+		self.Size = 0
 		self.head = None
 
-	def printList(self, serverIndex):
+	def printList(self, serverID):
 		current = self.head
-		print "---------------------"
-		print "\nJOBS IN QUEUE %s: "%serverIndex
+		print "\nJOBS IN QUEUE %s: "%serverID
 		while (current != None):
 			print "%s, class %s, ERPT = %.4f"%(current.job.name, current.job.priorityClass, current.job.ERPT)
 			current = current.nextNode
@@ -892,7 +895,6 @@ class JobClass(object):
 		self.ERPT = self.estimatedProcTime
 		self.arrivalTime = jobArrival
 
-
 #----------------------------------------------------------------------#
 # Class: MachineClass
 #
@@ -904,17 +906,17 @@ class JobClass(object):
 #
 #----------------------------------------------------------------------#
 class MachineClass(object):
-	#Queue = LinkedList()
 	PreviousJobs = []
 	LastClassPrevJobs = []
 	CurrentTime = 0.0
 	TimeUntilArrival = 0.0
 	StopSim = False	
 
-	ServerQueues = [LinkedList()] * NUM_SERVERS	# List of queue for each server
-	ServiceStartTimes = [None] * NUM_SERVERS	# Start times of job in each server
-	ProcessingJobs = [None] * NUM_SERVERS		# Array of current job in each server
-	ServersBusy = [False] * NUM_SERVERS			# Array of whether each server is busy	
+	#print NUM_SERVERS
+	#ServerQueues = [LinkedList() for i in range(NUM_SERVERS)] # List of queue for each server
+	#ServiceStartTimes = [None] * NUM_SERVERS	# Start times of job in each server
+	#ProcessingJobs = [None] * NUM_SERVERS		# Array of current job in each server
+	#ServersBusy = [False] * NUM_SERVERS			# Array of whether each server is busy	
 
 	NextRoutedTo = []
 
@@ -938,9 +940,11 @@ class MachineClass(object):
 		#MachineClass.ServerBusy = False
 		MachineClass.StopSim = False
 
-		for queue in range(len(MachineClass.ServerQueues)):
-			MachineClass.ServerQueues[queue].clear()
-		MachineClass.ServerQueues = [LinkedList()] * NUM_SERVERS
+		#for serverID in range(len(MachineClass.ServerQueues)):
+		#	MachineClass.ServerQueues[serverID].clear()
+		#MachineClass.ServerQueues = [LinkedList()] * NUM_SERVERS
+
+		#MachineClass.ServerQueues = [MachineClass.Queue1, MachineClass.Queue2] 	# List of queue for each server
 
 		MachineClass.ServiceStartTimes = [None] * NUM_SERVERS
 		MachineClass.ProcessingJobs = [None] * NUM_SERVERS
@@ -964,6 +968,8 @@ class MachineClass(object):
 		PercError[:] = [] 
 	
 		self.ctr = 0
+
+		MachineClass.ServerQueues = [LinkedList() for i in range(NUM_SERVERS)] # List of queue for each server
 
 	# Dictionary of arrival distributions
 	def setArrivalDist(self, arrRate, arrDist):
@@ -1054,7 +1060,6 @@ class MachineClass(object):
 					if(MachineClass.NextRoutedTo[priorityClass] > (NUM_SERVERS-1)):		# Reset after full loop of servers
 						MachineClass.NextRoutedTo[priorityClass] = 0	
 
-					print "\n JOB IS SENT TO SERVER %s \n"%(serverID)
 					# Return server id job is routed to
 					return serverID
 					
@@ -1063,7 +1068,7 @@ class MachineClass(object):
 
 	# Send job to server i
 	def sendJobToServer(self, job, i, numClasses):
-		GUI.writeToConsole(self.master, "sending %s to server %s"%(job.name, i))
+	#GUI.writeToConsole(self.master, "sending %s to server %s"%(job.name, i))
 	##	FOR EACH QUEUE, 
 		# If job is in the last class, sort by LCFS
 		if (job.priorityClass == numClasses):
@@ -1072,11 +1077,13 @@ class MachineClass(object):
 		else:
 			# Add current job with new class to queue 
 			MachineClass.ServerQueues[i].insertByClass(job)				# add job to queue
+
+		print MachineClass.ServerQueues[0].Size
+		print MachineClass.ServerQueues[1].Size
 		
 		# Print queue
 
 		print "\n\n" + str(MachineClass.CurrentTime) + ":" + str(MachineClass.NextRoutedTo)
-		MachineClass.ServerQueues[i].printList(i)
 
 
 	def calcNumJobs(self, jobID):
@@ -1165,16 +1172,13 @@ class MachineClass(object):
 		#self.calcNumJobsPerClass(numClasses)
 
 		self.assignClass(numClasses, J, MachineClass.PreviousJobs, 0, 0)	# Give job a class, and add to queue
-		serverIndex = self.router(J, numClasses)							# Send job to a server queue
+		serverID = self.router(J, numClasses)							# Send job to a server queue
 
-		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s, server = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass, serverIndex))		
-		
-		print "1processing %s at server %s"%(J.name, serverIndex)
+		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s, server = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass, serverID))		
+
 		self.updateJobs()		# update all processing jobs
 
-		
-		print "2processing %s at server %s"%(J.name, serverIndex)
-		procJob = MachineClass.ProcessingJobs[serverIndex]
+		procJob = MachineClass.ProcessingJobs[serverID]
 
 		# Preempt processing job at server if arriving job is smaller
 		if (procJob != None):
@@ -1182,19 +1186,24 @@ class MachineClass(object):
 				GUI.writeToConsole(self.master, "%.6f | %s preempting %s"%(MachineClass.CurrentTime, J.name, procJob.name))
 
 				#Remove procJob from processing
-				MachineClass.ServersBusy[serverIndex] = False
-				MachineClass.ProcessingJobs[serverIndex] = None
-				MachineClass.ServiceStartTimes[serverIndex] = None
+				MachineClass.ServersBusy[serverID] = False
+				MachineClass.ProcessingJobs[serverID] = None
+				MachineClass.ServiceStartTimes[serverID] = None
 
 				# Add preempted job back to queue
 				# If job is in the last class, sort by LCFS
 				if (procJob.priorityClass == numClasses):
-					MachineClass.ServerQueues[serverIndex].insertByLCFS(procJob, numClasses);
+					MachineClass.ServerQueues[serverID].insertByLCFS(procJob, numClasses);
 
 				else:
 					# Add current job with new class to queue 
-					MachineClass.ServerQueues[serverIndex].insertByClass(procJob)				# add job to queue
-					GUI.writeToConsole(self.master, "%.6f | %s added back to queue, ERPT = %.5f"%(MachineClass.CurrentTime, procJob.name, procJob.ERPT))
+					MachineClass.ServerQueues[serverID].insertByClass(procJob)				# add job to queue
+					GUI.writeToConsole(self.master, "%.6f | %s added back to server %s, ERPT = %.5f"%(MachineClass.CurrentTime, procJob.name, serverID, procJob.ERPT))
+
+		################
+		for i in range(NUM_SERVERS):
+			MachineClass.ServerQueues[i].printList(i)
+		###############
 
 		self.saveNumJobs(MachineClass.CurrentTime, MachineClass.AvgNumJobs, load, percErrorMin, percErrorMax)
 		self.saveArrivals(J, load, percErrorMin, percErrorMax)
@@ -1205,20 +1214,21 @@ class MachineClass(object):
 
 	# Processing first job in queue
 	def processJobs(self):
-		for i in range(NUM_SERVERS):
+		for serverID in range(NUM_SERVERS):
+			#print "server %s is busy %s"%(serverID, MachineClass.ServersBusy[serverID])
+			print "server %s has queue size %s"%(serverID, MachineClass.ServerQueues[serverID].Size)
+		for serverID in range(NUM_SERVERS):
 			#Server i not busy and a job is waiting in the queue
-			print "size of queue %s is %s"%(i, MachineClass.ServerQueues[i].Size)
+			if (MachineClass.ServersBusy[serverID] == False) and (MachineClass.ServerQueues[serverID].Size > 0):
+				currentJob = MachineClass.ServerQueues[serverID].getHead().job
 
+				#GUI.writeToConsole(self.master, "%s is first at server %s------------------------------------------"%(currentJob.name,serverID))
 
-			if (MachineClass.ServersBusy[i] == False) and (MachineClass.ServerQueues[i].Size > 0):
-				currentJob = MachineClass.ServerQueues[i].getHead().job
-				GUI.writeToConsole(self.master, "%s is first at server %s------------------------------------------"%(currentJob.name, i))
-
-				MachineClass.ServiceStartTimes[i] = MachineClass.CurrentTime
-				MachineClass.ProcessingJobs[i] = currentJob
-				MachineClass.ServersBusy[i] = True
-				GUI.writeToConsole(self.master, "%.6f | %s processing on server %s"%(MachineClass.CurrentTime, currentJob.name, i))
-				MachineClass.ServerQueues[i].removeHead()
+				MachineClass.ServiceStartTimes[serverID] = MachineClass.CurrentTime
+				MachineClass.ProcessingJobs[serverID] = currentJob
+				MachineClass.ServersBusy[serverID] = True
+				GUI.writeToConsole(self.master, "%.6f | %s processing on server %s"%(MachineClass.CurrentTime, currentJob.name, serverID))
+				MachineClass.ServerQueues[serverID].removeHead()
 
 	# Job completed
 	def completionEvent(self, numClasses, completingJob, load, percErrorMin, percErrorMax):
@@ -1229,18 +1239,18 @@ class MachineClass(object):
 		#self.calcNumJobsPerClass(numClasses)
 
 		# Server no longer busy
-		serverIndex = MachineClass.ProcessingJobs.index(completingJob)
-		MachineClass.ServersBusy[serverIndex] = False
-		MachineClass.ProcessingJobs[serverIndex] = None
-		MachineClass.ServiceStartTimes[serverIndex] = None
+		serverID = MachineClass.ProcessingJobs.index(completingJob)
+		MachineClass.ServersBusy[serverID] = False
+		MachineClass.ProcessingJobs[serverID] = None
+		MachineClass.ServiceStartTimes[serverID] = None
 
 		TimeSys.append(MachineClass.CurrentTime - completingJob.arrivalTime)
 		ProcTime.append(completingJob.procTime)
 		PercError.append(abs(completingJob.percentError))
 
-		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED at server %s"%(MachineClass.CurrentTime, completingJob.name, serverIndex))
+		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED at server %s"%(MachineClass.CurrentTime, completingJob.name, serverID))
 
-		if (MachineClass.ServerQueues[serverIndex].Size > 0):
+		if (MachineClass.ServerQueues[serverID].Size > 0):
 			self.processJobs()
 
 
@@ -1274,7 +1284,11 @@ class MachineClass(object):
 			else:
 				completingJob = minProcJob
 				MachineClass.CurrentTime += completingJob.RPT
+
 				self.completionEvent(numClasses, completingJob, load, percErrorMin, percErrorMax)
+
+				for i in range(NUM_SERVERS):
+					MachineClass.ServerQueues[i].printList(i)
 
 			# If current time is greater than the simulation length, end program
 			if (MachineClass.CurrentTime > simLength) or (MachineClass.StopSim == True):
