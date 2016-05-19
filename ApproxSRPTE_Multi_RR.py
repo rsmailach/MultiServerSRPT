@@ -1077,13 +1077,8 @@ class MachineClass(object):
 		else:
 			# Add current job with new class to queue 
 			MachineClass.ServerQueues[i].insertByClass(job)				# add job to queue
-
-		print MachineClass.ServerQueues[0].Size
-		print MachineClass.ServerQueues[1].Size
 		
-		# Print queue
-
-		print "\n\n" + str(MachineClass.CurrentTime) + ":" + str(MachineClass.NextRoutedTo)
+		print "\n\n" + str(MachineClass.CurrentTime) + "::::::::::::::::::::::::::::::::::::" #+ str(MachineClass.NextRoutedTo)
 
 
 	def calcNumJobs(self, jobID):
@@ -1198,7 +1193,7 @@ class MachineClass(object):
 				else:
 					# Add current job with new class to queue 
 					MachineClass.ServerQueues[serverID].insertByClass(procJob)				# add job to queue
-					GUI.writeToConsole(self.master, "%.6f | %s added back to server %s, ERPT = %.5f"%(MachineClass.CurrentTime, procJob.name, serverID, procJob.ERPT))
+					GUI.writeToConsole(self.master, "%.6f | %s added back to server %s, class = %s"%(MachineClass.CurrentTime, procJob.name, serverID, procJob.priorityClass))
 
 		################
 		for i in range(NUM_SERVERS):
