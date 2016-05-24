@@ -1077,8 +1077,6 @@ class MachineClass(object):
 		else:
 			# Add current job with new class to queue 
 			MachineClass.ServerQueues[i].insertByClass(job)				# add job to queue
-		
-		print "\n\n" + str(MachineClass.CurrentTime) + "::::::::::::::::::::::::::::::::::::" #+ str(MachineClass.NextRoutedTo)
 
 
 	def calcNumJobs(self, jobID):
@@ -1199,7 +1197,7 @@ class MachineClass(object):
 
 		self.saveNumJobs(MachineClass.CurrentTime, MachineClass.AvgNumJobs, load, percErrorMin, percErrorMax)
 		self.saveArrivals(J, load, percErrorMin, percErrorMax)
-		self.processJobs(procJob)		# process first job in each queue
+		self.processJobs()		# process first job in each queue
 
 		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, arrDist)
 		self.ctr += 1
