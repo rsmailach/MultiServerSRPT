@@ -13,13 +13,13 @@
 from Tkinter import *
 from datetime import datetime
 from math import log
-#import plotly.plotly as py
-#from plotly.graph_objs import Scatter
-#import plotly.graph_objs as go
-from bokeh.plotting import figure, output_file, show
-from bokeh.charts import Bar, output_file, show
-from collections import OrderedDict
-import pandas
+import plotly.plotly as py
+from plotly.graph_objs import Scatter
+import plotly.graph_objs as go
+#from bokeh.plotting import figure, output_file, show
+#from bokeh.charts import Bar, output_file, show
+#from collections import OrderedDict
+#import pandas
 from itertools import cycle
 
 import copy
@@ -29,6 +29,11 @@ import ttk
 import tkFileDialog
 import csv
 import operator
+
+import sqlite3
+import pandas
+
+conn=sqlite3.connect('MultiServerDatabase_ASRPTE_RR.db')
 
 NumJobs = []
 NumJobsTime = []
@@ -48,7 +53,10 @@ class GUI(Tk):
 		Tk.__init__(self, master)
 		self.master = master        # reference to parent
 		self.statusText = StringVar()
-		self.seed = random.seed(datetime.now())
+		global SEED
+		#SEED = random.randint(0, 1000000000)
+		SEED = 994863731
+		random.seed(SEED)
 
 		# Create the input frame
 		self.frameIn = Input(self)
@@ -147,88 +155,110 @@ class GUI(Tk):
 		self.writeToConsole("Number of Classes = %d"%numClasses)
 		self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
 
-	def plotNumJobsInSys(self, numClasses):
-		# SCATTER PLOT
-		output_file("SRPT_NumJobsInSys: Case 4")
-		scatter = figure(title = "Average Number of Jobs Over Time",
-						x_axis_label = "Time",
-						y_axis_label = "Number of Jobs")
-		#trace0.scatter(NumJobsTime, NumJobs)
-		scatter.line(NumJobsTime, NumJobs)
-		scatter.circle(NumJobsTime, NumJobs, size=1)
-		show(scatter)
+	def saveParams(self, load, arrRate, arrDist, procRate, procDist, percErrorMin, percErrorMax, numClasses, simLength, alpha, lower, upper):
+		params = pandas.DataFrame({	'seed' : [SEED],
+									'numServers' : [NUM_SERVERS],
+									'load' : [load],
+									'arrRate' : [arrRate],
+									'arrDist' : [arrDist],
+									'procRate' : [procRate],
+									'procDist' : [procDist],
+									'alpha' : [alpha],
+									'lower' : [lower],
+									'upper' : [upper],
+									'percErrorMin' : [percErrorMin],
+									'percErrorMax' : [percErrorMax],
+									'numClasses' : [numClasses],
+									'simLength' : [simLength],
+									'avgNumJobs' : [MachineClass.AvgNumJobs],
+									#'avgNumJobsClass' : [MachineClass.AvgNumJobsClass]
+									})
+
+		params.to_sql(name='parameters', con=conn, if_exists='append')
+		print params
+
+	# def plotNumJobsInSys(self, numClasses):
+	# 	# SCATTER PLOT
+	# 	output_file("SRPT_NumJobsInSys: Case 4")
+	# 	scatter = figure(title = "Average Number of Jobs Over Time",
+	# 					x_axis_label = "Time",
+	# 					y_axis_label = "Number of Jobs")
+	# 	#trace0.scatter(NumJobsTime, NumJobs)
+	# 	scatter.line(NumJobsTime, NumJobs)
+	# 	scatter.circle(NumJobsTime, NumJobs, size=1)
+	# 	show(scatter)
 
 
-
-		#-----------------------------------------------------------------------------#
-		# BLOCK DIAGRAM
-		output_file("SRPT_NumJobsInSysPerClass: Case4")
-
-		classRange = range(1, numClasses + 1)
-		classes = [format(i,'02d') for i in classRange]
-
-		# remove placeholder element
-		MachineClass.AvgNumJobsArray.pop(0)
-
-		dictionary = {'number of jobs': MachineClass.AvgNumJobsArray, 'classes': classes}
-		df = pandas.DataFrame(data=dictionary)
-
-		bar = Bar(df, 'classes', values='number of jobs', title="test chart")
-		show(bar)
-
-	# def plotNumJobsInSys1(self, numClasses):
-	# 	py.sign_in('mailacrs','wowbsbc0qo')
-	# 	trace0 = Scatter(x=NumJobsTime, y=NumJobs)
-	# 	data = [trace0]
-	# 	layout = go.Layout(
-	# 		title='Average Number of Jobs Over Time',
-	# 		xaxis=dict(
-	# 			title='Time',
-	# 			titlefont=dict(
-	# 			family='Courier New, monospace',
-	# 			size=18,
-	# 			color='#7f7f7f'
-	# 		)
-	# 	),
-	# 		yaxis=dict(
-	# 			title='Number of Jobs',
-	# 			titlefont=dict(
-	# 			family='Courier New, monospace',
-	# 			size=18,
-	# 			color='#7f7f7f'
-	# 		)
-	# 	)
-	# 	)
-	# 	fig = go.Figure(data=data, layout=layout)
-	# 	unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys: Case1')
 
 	# 	#-----------------------------------------------------------------------------#
-	# 	# Average jobs/class
-	# 	trace1 = go.Bar(y= MachineClass.AvgNumJobsArray)
+	# 	# BLOCK DIAGRAM
+	# 	output_file("SRPT_NumJobsInSysPerClass: Case4")
+
+	# 	classRange = range(1, numClasses + 1)
+	# 	classes = [format(i,'02d') for i in classRange]
+
+	# 	# remove placeholder element
+	# 	MachineClass.NumJobsClass.pop(0)
+
+	# 	dictionary = {'number of jobs': MachineClass.NumJobsClass, 'classes': classes}
+	# 	df = pandas.DataFrame(data=dictionary)
+
+	# 	bar = Bar(df, 'classes', values='number of jobs', title="test chart")
+	# 	show(bar)
+
+	def plotNumJobsInSys(self, numClasses):
+		py.sign_in('mailacrs','wowbsbc0qo')
+		trace0 = Scatter(x=NumJobsTime, y=NumJobs)
+		data = [trace0]
+		layout = go.Layout(
+			title='Average Number of Jobs Over Time',
+			xaxis=dict(
+				title='Time',
+				titlefont=dict(
+				family='Courier New, monospace',
+				size=18,
+				color='#7f7f7f'
+			)
+		),
+			yaxis=dict(
+				title='Number of Jobs',
+				titlefont=dict(
+				family='Courier New, monospace',
+				size=18,
+				color='#7f7f7f'
+			)
+		)
+		)
+		fig = go.Figure(data=data, layout=layout)
+		unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys')
+
+		#-----------------------------------------------------------------------------#
+		# Average jobs/class
+		trace1 = go.Bar(y= MachineClass.NumJobsClass)
 		
-	# 	data1 = [trace1]
-	# 	layout1 = go.Layout(
-	# 		title='Average Number of Jobs Per Class',
-	# 		xaxis=dict(
-	# 			title='Classes',
-	# 			range=[1,numClasses],              # set range
-	# 			titlefont=dict(
-	# 			family='Courier New, monospace',
-	# 			size=18,
-	# 			color='#7f7f7f'
-	# 		)
-	# 	),
-	# 		yaxis=dict(
-	# 			title='Number of Jobs',
-	# 			titlefont=dict(
-	# 			family='Courier New, monospace',
-	# 			size=18,
-	# 			color='#7f7f7f'
-	# 		)
-	# 	)
-	# 	)
-	# 	fig1 = go.Figure(data=data1, layout=layout1)
-	# 	unique_url1 = py.plot(fig1, filename = 'SRPT_NumJobsInSysPerClass: Case1')
+		data1 = [trace1]
+		layout1 = go.Layout(
+			title='Average Number of Jobs Per Class',
+			xaxis=dict(
+				title='Classes',
+				range=[-0.5,numClasses - 0.5],              # set range
+				titlefont=dict(
+				family='Courier New, monospace',
+				size=18,
+				color='#7f7f7f'
+			)
+		),
+			yaxis=dict(
+				title='Number of Jobs',
+				titlefont=dict(
+				family='Courier New, monospace',
+				size=18,
+				color='#7f7f7f'
+			)
+		)
+		)
+		fig1 = go.Figure(data=data1, layout=layout1)
+		unique_url1 = py.plot(fig1, filename = 'SRPT_NumJobsInSysPerClass')
 
 	def calcVariance(self, List, avg):
 		var = 0
@@ -305,6 +335,20 @@ class GUI(Tk):
 				I.valuesList[5],				# num class
 				I.valuesList[6])				# sim time
 
+		self.plotNumJobsInSys(I.valuesList[5])
+
+		self.saveParams(I.valuesList[1],		#load
+					'?', 						# arrival rate
+					'Exponential',					# arrival dist
+					'?', I.distList[1],	# processing
+					I.valuesList[3], 				# error min
+					I.valuesList[4],				# error max
+					I.valuesList[5], 				# num classes
+					I.valuesList[6],				# sim time
+					JobClass.BPArray[0],			# alpha
+					JobClass.BPArray[1],			# lower
+					JobClass.BPArray[2])			# upper				
+
 		#self.displayAverageData(I.valuesList[5])
 		#self.saveData()
 		self.updateStatusBar("Simulation complete.")
@@ -336,7 +380,7 @@ class Input(LabelFrame):
 		self.loadInput.set(0.95)       		 	   	##################################CHANGE LATER
 		#self.arrivalRateInput.set(1.0)         	 ##################################CHANGE LATER
 		self.processingRateInput.set(0.5)   	    ##################################CHANGE LATER
-		self.percentErrorMinInput.set(0)          ##################################CHANGE LATER
+		self.percentErrorMinInput.set(-50)          ##################################CHANGE LATER
 		self.percentErrorMaxInput.set(0)          ##################################CHANGE LATER
 		self.numberOfClassesInput.set(10)			##################################CHANGE LATER
 		self.simLengthInput.set(100.0)           ##################################CHANGE LATER
@@ -925,7 +969,7 @@ class MachineClass(object):
 	PrevNumJobs = 0
 	AvgNumJobs = 0
 	PrevNumJobsArray = []
-	AvgNumJobsArray = []
+	NumJobsClass = []
 	counter = 0
 
 
@@ -958,7 +1002,7 @@ class MachineClass(object):
 		MachineClass.PrevNumJobs = 0
 		MachineClass.AvgNumJobs = 0		
 		MachineClass.PrevNumJobsArray[:] = []
-		MachineClass.AvgNumJobsArray[:] = []
+		MachineClass.NumJobsClass[:] = []
 		MachineClass.counter = 0
 
 		NumJobs[:] = []
@@ -1080,7 +1124,10 @@ class MachineClass(object):
 
 
 	def calcNumJobs(self, jobID):
-		self.currentNumJobs = MachineClass.Queue.Size
+		self.currentNumJobs = 0
+		for serverID in range(NUM_SERVERS):
+			self.currentNumJobs += MachineClass.ServerQueues[serverID].Size
+		
 		self.t = MachineClass.CurrentTime
 		self.delta_t = self.t - MachineClass.PrevTime 
 
@@ -1096,9 +1143,28 @@ class MachineClass(object):
 		# PrevNum jobs becomes current num jobs
 		MachineClass.PrevNumJobs = self.currentNumJobs
 
+		NumJobs.append(MachineClass.AvgNumJobs)				# y axis of plot
+		NumJobsTime.append(MachineClass.CurrentTime)		# x axis of plot
+
 
 	def calcNumJobsPerClass(self, numClasses):
-		numJobsArray = list(MachineClass.Queue.countClassesQueued(numClasses))
+		totalNumJobs = [0] * numClasses
+		for serverID in range(NUM_SERVERS):
+			#Sum all jobs in each server queue by class
+			currentNumJobs = list(MachineClass.ServerQueues[serverID].countClassesQueued(numClasses)) # Array of jobs by class in total (all servers)
+			#print "current: %s"%currentNumJobs
+			totalNumJobs = [i + j for i, j in zip(totalNumJobs, currentNumJobs)]
+			#print "total: %s"%totalNumJobs 
+
+			#Add jobs that are processing to the total number in the system
+			try:
+				procJob = MachineClass.ProcessingJobs[serverID]	# Get processing job from server i
+				for priorityClass in range(numClasses):			
+					if(priorityClass == procJob.priorityClass):	
+						totalNumJobs[priorityClass] += 1		# Add processing job to the count of the class
+						#print "total: %s"%totalNumJobs 
+			except:
+				pass
 
 		self.t = MachineClass.CurrentTime 
 		self.delta_t = self.t - MachineClass.PrevTimeA
@@ -1107,16 +1173,21 @@ class MachineClass(object):
 			# If one job in system
 			if(MachineClass.counter == 0):
 				MachineClass.PrevNumJobsArray = [0] * (numClasses) 			# creates array of size (numClasses + 1) filled with 0s
-				MachineClass.AvgNumJobsArray = list(numJobsArray)			# First event is always create new job
+				MachineClass.NumJobsClass = list(totalNumJobs)			# First event is always create new job
 				MachineClass.counter = 1
 			# UPDATE 
 			else:
-				MachineClass.AvgNumJobsArray[i] = (float(MachineClass.PrevTimeA)/self.t)*float(MachineClass.AvgNumJobsArray[i]) + float(MachineClass.PrevNumJobsArray[i])*(float(self.delta_t)/self.t)
+				MachineClass.NumJobsClass[i] = (float(MachineClass.PrevTimeA)/self.t)*float(MachineClass.NumJobsClass[i]) + float(MachineClass.PrevNumJobsArray[i])*(float(self.delta_t)/self.t)
+
+		#print "--%s"%MachineClass.NumJobsClass
 									
 		# PrevTime becomes "old" t (set in regular caclulation)
 		MachineClass.PrevTimeA = self.t 
 		# PrevNum jobs becomes current num jobs
-		MachineClass.PrevNumJobsArray = list(numJobsArray)
+		MachineClass.PrevNumJobsArray = list(totalNumJobs)
+
+	def calcNumJobsPerClassPerServer(self):
+		pass
 
 	def saveNumJobs(self, currentTime, avgNumJobs, load, errorMin, errorMax):
 		text = "%.6f,%.6f"%(currentTime, avgNumJobs) + "\n"
@@ -1161,8 +1232,8 @@ class MachineClass(object):
 		J.name = "Job%02d"%self.ctr
 		
 
-		#self.calcNumJobs(self.ctr)
-		#self.calcNumJobsPerClass(numClasses)
+		self.calcNumJobs(self.ctr)
+		self.calcNumJobsPerClass(numClasses)
 
 		self.assignClass(numClasses, J, MachineClass.PreviousJobs, 0, 0)	# Give job a class, and add to queue
 		serverID = self.router(J, numClasses)								# Send job to a server queue
@@ -1220,8 +1291,8 @@ class MachineClass(object):
 		completingJob.completionTime = MachineClass.CurrentTime
 		self.saveJobs(completingJob, load, percErrorMin, percErrorMax)			# save to list of arrivals, for testing
 
-		#self.calcNumJobs(self.ctr)
-		#self.calcNumJobsPerClass(numClasses)
+		self.calcNumJobs(self.ctr)
+		self.calcNumJobsPerClass(numClasses)
 
 		# Server no longer busy
 		serverID = MachineClass.ProcessingJobs.index(completingJob)
