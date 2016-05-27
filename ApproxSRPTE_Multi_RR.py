@@ -1111,22 +1111,27 @@ class MachineClass(object):
 
 
 	# Send job to server i
-	def sendJobToServer(self, job, i, numClasses):
-	#GUI.writeToConsole(self.master, "sending %s to server %s"%(job.name, i))
+	def sendJobToServer(self, job, serverID, numClasses):
 	##	FOR EACH QUEUE, 
 		# If job is in the last class, sort by LCFS
-		if (job.priorityClass == numClasses):
-			MachineClass.ServerQueues[i].insertByLCFS(job, numClasses);
+		if (job.priorityClass == (numClasses - 1)):
+			MachineClass.ServerQueues[serverID].insertByLCFS(job, numClasses);
+			#GUI.writeToConsole(self.master, "sending job %s, class %s to server %s LCFS"%(job.name, job.priorityClass, serverID))
 
 		else:
 			# Add current job with new class to queue 
-			MachineClass.ServerQueues[i].insertByClass(job)				# add job to queue
-
+			MachineClass.ServerQueues[serverID].insertByClass(job)				# add job to queue
+			#GUI.writeToConsole(self.master, "sending job %s, class %s to server %s CLASS"%(job.name, job.priorityClass, serverID))
 
 	def calcNumJobs(self, jobID):
 		self.currentNumJobs = 0
 		for serverID in range(NUM_SERVERS):
+			# Firstly, add all jobs that are waiting in queue
 			self.currentNumJobs += MachineClass.ServerQueues[serverID].Size
+
+			# Secondly, add jobs that are currently processing to the total number in the system
+			if(MachineClass.ServersBusy[serverID] == True):
+				self.currentNumJobs += 1
 		
 		self.t = MachineClass.CurrentTime
 		self.delta_t = self.t - MachineClass.PrevTime 
