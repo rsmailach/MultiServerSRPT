@@ -1116,7 +1116,7 @@ class MachineClass(object):
 		# If job is in the last class, sort by LCFS
 		if (job.priorityClass == (numClasses - 1)):
 			MachineClass.ServerQueues[serverID].insertByLCFS(job, numClasses);
-			#GUI.writeToConsole(self.master, "sending job %s, class %s to server %s LCFS"%(job.name, job.priorityClass, serverID))
+			GUI.writeToConsole(self.master, "sending job %s, class %s to server %s LCFS"%(job.name, job.priorityClass, serverID))
 
 		else:
 			# Add current job with new class to queue 
