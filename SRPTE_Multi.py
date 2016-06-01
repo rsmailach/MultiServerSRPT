@@ -11,9 +11,9 @@
 
 from Tkinter import *
 from datetime import datetime
-#import plotly.plotly as py
-#from plotly.graph_objs import Scatter
-#import plotly.graph_objs as go
+import plotly.plotly as py
+from plotly.graph_objs import Scatter
+import plotly.graph_objs as go
 import random
 import tkMessageBox
 import ttk
@@ -21,13 +21,10 @@ import tkFileDialog
 import sqlite3
 import pandas
 
-conn=sqlite3.connect('MultiServerDatabase.db')
+conn=sqlite3.connect('MultiServerDatabase_SRPT.db')
 
 NumJobs = []
 NumJobsTime = []
-TimeSys = []
-ProcTime = []
-PercError = []
 NUM_SERVERS = 0
 
 #----------------------------------------------------------------------#
@@ -42,7 +39,8 @@ class GUI(Tk):
 		self.master = master        # reference to parent
 		self.statusText = StringVar()
 		global SEED
-		SEED = datetime.now() 
+		#SEED = random.randint(0, 1000000000)
+		SEED = 994863731
 		random.seed(SEED)
 
 		# Create the input frame
@@ -174,57 +172,42 @@ class GUI(Tk):
 			var += (avg - i)**2
 		return var/len(List)
 
-	def displayAverageData(self):
-		##AvgNumJobs = int(float(sum(NumJobs))/len(NumJobs))
-		AvgNumJobs = MachineClass.AvgNumJobs
-		AvgTimeSys = float(sum(TimeSys))/len(TimeSys)
-		AvgProcTime = float(sum(ProcTime))/len(ProcTime)
-		VarProcTime = self.calcVariance(ProcTime, AvgProcTime)
-		AvgPercError = float(sum(PercError))/len(PercError)
 
-		self.writeToConsole('\n\nAverage number of jobs in the system %s' %AvgNumJobs)
-		self.writeToConsole('Average time in system, from start to completion is %s' %AvgTimeSys)
-		self.writeToConsole('Average processing time, based on generated service times is %s' %AvgProcTime)
-		self.writeToConsole('Variance of processing time %s' %VarProcTime)
-		self.writeToConsole('Average percent error %.4f\n' %AvgPercError)
-		#self.writeToConsole('Request order: %s' % ArrivalClass.JobOrderIn)
-		#self.writeToConsole('Service order: %s\n\n' % MachineClass.JobOrderOut)
-
-	# def plotNumJobsInSys(self, load, errorMin, errorMax):
-	# 	py.sign_in('mailacrs','wowbsbc0qo')
+	def plotNumJobsInSys(self, load, errorMin, errorMax):
+		py.sign_in('mailacrs','wowbsbc0qo')
 
 
-	# 	if (abs(errorMin) == errorMax):
-	# 		self.error = str(int(errorMax))
-	# 	else:
-	# 		self.error = str(int(errorMin)) + "_" + str(int(errorMax))
+		#if (abs(errorMin) == errorMax):
+		#	self.error = str(int(errorMax))
+		#else:
+		#	self.error = str(int(errorMin)) + "_" + str(int(errorMax))
 
-	# 	self.name = "NumJobs_numServers=%s_load=%s_alpha=%s_error=%s"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error)
-	# 	params = pandas.read_csv(self.name)
+		#self.name = "NumJobs_numServers=%s_load=%s_alpha=%s_error=%s"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error)
+		#params = pandas.read_csv(self.name)
 
-	# 	trace0 = Scatter(x=params["NumJobsTime"], y=params["NumJobs"])
-	# 	data = [trace0]
-	# 	layout = go.Layout(
-	# 		title='Average Number of Jobs Over Time',
-	# 		xaxis=dict(
-	# 			title='Time',
-	# 			titlefont=dict(
-	# 			family='Courier New, monospace',
-	# 			size=18,
-	# 			color='#7f7f7f'
-	# 		)
-	# 	),
-	# 		yaxis=dict(
-	# 			title='Number of Jobs',
-	# 			titlefont=dict(
-	# 			family='Courier New, monospace',
-	# 			size=18,
-	# 			color='#7f7f7f'
-	# 		)
-	# 	)
-	# 	)
-	# 	fig = go.Figure(data=data, layout=layout)
-	# 	unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys: '+ str(self.name))
+		trace0 = Scatter(x=NumJobsTime, y=NumJobs)
+		data = [trace0]
+		layout = go.Layout(
+			title='Average Number of Jobs Over Time',
+			xaxis=dict(
+				title='Time',
+				titlefont=dict(
+				family='Courier New, monospace',
+				size=18,
+				color='#7f7f7f'
+			)
+		),
+			yaxis=dict(
+				title='Number of Jobs',
+				titlefont=dict(
+				family='Courier New, monospace',
+				size=18,
+				color='#7f7f7f'
+			)
+		)
+		)
+		fig = go.Figure(data=data, layout=layout)
+		unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys')
 
 
 	def stopSimulation(self, event):
@@ -275,13 +258,8 @@ class GUI(Tk):
 						JobClass.BPArray[1],			# lower
 						JobClass.BPArray[2])			# upper
 
-
-
-
-
-		self.displayAverageData()
-		#self.plotNumJobsInSys(I.valuesList[1], I.valuesList[4], I.valuesList[5])
-		#self.saveData()
+	
+		self.plotNumJobsInSys(I.valuesList[1], I.valuesList[4], I.valuesList[5])
 		self.updateStatusBar("Simulation complete.")
 
 
@@ -308,7 +286,7 @@ class Input(LabelFrame):
 		self.comboboxVal = StringVar()
 
 		self.numServersInput.set(2)				##################################CHANGE LATER	
-		self.loadDefault = 0.8					##################################CHANGE LATER	
+		self.loadDefault = 0.9					##################################CHANGE LATER	
 		self.arrRateDefault = 0.8				##################################CHANGE LATER
 		self.procRateDefault = 0.5				##################################CHANGE LATER
 
@@ -317,7 +295,7 @@ class Input(LabelFrame):
 		self.processingRateInput.set(self.procRateDefault)
 		self.percentErrorMinInput.set(-20)
 		self.percentErrorMaxInput.set(20)
-		self.simLengthInput.set(100.0)
+		self.simLengthInput.set(10000.0)
 
 		self.grid_columnconfigure(0, weight=2)
 		self.grid_columnconfigure(1, weight=2)
@@ -872,15 +850,6 @@ class MachineClass(object):
 		}
 		return ArrivalDistributions[arrDist]
 	
-	def getFirstQueued(self):
-		job = None
-		if (MachineClass.Queue.head != None):
-			job = MachineClass.Queue.head.job
-		return job
-
-	def removeFirstQueued(self):
-		MachineClass.Queue.removeHead()	# remove first job from queue
-
 	#update data
 	def updateJobs(self):
 		for index in range(NUM_SERVERS):
@@ -897,11 +866,11 @@ class MachineClass(object):
 			if(MachineClass.ServersBusy[i] == True):
 				self.currentNumJobs += 1
 
-		# Secondly, add all jobs in queue
+		# Secondly, add all jobs that are waiting in queue
 		self.currentNumJobs += MachineClass.Queue.Size
 		
 
-		changeInJobs = MachineClass.PrevNumJobs - self.currentNumJobs
+		#changeInJobs = MachineClass.PrevNumJobs - self.currentNumJobs
 		self.t = MachineClass.CurrentTime
 		self.delta_t = self.t - MachineClass.PrevTime 
 
@@ -917,47 +886,19 @@ class MachineClass(object):
 		# PrevNum jobs becomes current num jobs
 		MachineClass.PrevNumJobs = self.currentNumJobs
 
-	def saveNumJobs(self, currentTime, avgNumJobs, load, errorMin, errorMax):
-		text = "%.6f,%.6f"%(currentTime, avgNumJobs) + "\n"
-
-		if (abs(errorMin) == errorMax):
-			self.error = str(int(errorMax))
-		else:
-			self.error = str(int(errorMin)) + "_" + str(int(errorMax))
-		
-		with open("NumJobs_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
-			myFile.write(text)
-		myFile.close()		
-
-	#def saveArrivals(self, job, load, errorMin, errorMax):
-	#	text = "%s,%.6f,%.6f,%.6f"%(job.name, job.arrivalTime, job.RPT, job.ERPT) + "\n"
-	#
-	#	if (abs(errorMin) == errorMax):
-	#		self.error = str(int(errorMax))
-	#	else:
-	#		self.error = str(int(errorMin)) + "_" + str(int(errorMax))	
-	#	
-	#	with open("Arrivals_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
-	#		myFile.write(text)
-	#	myFile.close()		
-
-	#def saveJobs(self, job, load, errorMin, errorMax):
-	#	text = "%s,%.6f"%(job.name, job.completionTime) + "\n"
-	#
-	#	if (abs(errorMin) == errorMax):
-	#		self.error = str(int(errorMax))
-	#	else:
-	#		self.error = str(int(errorMin)) + "_" + str(int(errorMax))
-
-	#	with open("Jobs_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
-	#		myFile.write(text)
-	#	myFile.close()				
+		print "%.6f | average num jobs %s"%(MachineClass.CurrentTime, MachineClass.AvgNumJobs)
+		NumJobs.append(MachineClass.AvgNumJobs)				# y axis of plot
+		NumJobsTime.append(MachineClass.CurrentTime)		# x axis of plot			
 
 	# Job arriving
 	def arrivalEvent(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax):
 		J = JobClass(self.master)
 		J.setJobAttributes(load, procRate, procDist, percErrorMin, percErrorMax, MachineClass.CurrentTime)
 		J.name = "Job%02d"%self.ctr
+
+		self.calcNumJobs(self.ctr)
+		self.saveNumJobs(MachineClass.CurrentTime, MachineClass.AvgNumJobs, load, percErrorMin, percErrorMax)
+		#self.saveArrivals(J, load, percErrorMin, percErrorMax)
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))	
 		self.updateJobs()				# update all processing jobs
@@ -971,7 +912,8 @@ class MachineClass(object):
 
 			# Preempt largest job processing if all servers busy
 			if (maxERPT > J.ERPT)and(all(element == True for element in MachineClass.ServersBusy)):
-				GUI.writeToConsole(self.master, "%.6f | %s preempting %s"%(MachineClass.CurrentTime, J.name, maxProcJob.name))
+				#GUI.writeToConsole(self.master, "%.6f | %s preempting %s"%(MachineClass.CurrentTime, J.name, maxProcJob.name))
+				GUI.writeToConsole(self.master, "----------- | %s preempting %s"%(J.name, maxProcJob.name))
 				#Remove maxProcJob from server
 				serverIndex = MachineClass.ProcessingJobs.index(maxProcJob)
 				MachineClass.ServersBusy[serverIndex] = False
@@ -980,16 +922,14 @@ class MachineClass(object):
 
 				#add back to queue
 				MachineClass.Queue.insert(maxProcJob)	# add job to queue
-				GUI.writeToConsole(self.master, "%.6f | %s added back to queue, ERPT = %.5f"%(MachineClass.CurrentTime, maxProcJob.name, maxProcJob.ERPT))
+				#GUI.writeToConsole(self.master, "%.6f | %s added back to queue, ERPT = %.5f"%(MachineClass.CurrentTime, maxProcJob.name, maxProcJob.ERPT))
+				GUI.writeToConsole(self.master, "----------- | %s added back to queue, ERPT = %.5f"%(maxProcJob.name, maxProcJob.ERPT))
 
 		except ValueError:
 			maxERPT = 10^100
 			maxProcJob = None			
 
 		MachineClass.Queue.insert(J)	# add job to queue
-		#self.calcNumJobs(self.ctr)
-		#self.saveNumJobs(MachineClass.CurrentTime, MachineClass.AvgNumJobs, load, percErrorMin, percErrorMax)
-		#self.saveArrivals(J, load, percErrorMin, percErrorMax)
 		self.processJobs()				# process first job in queue	
 
 		# Generate next arrival
@@ -998,21 +938,22 @@ class MachineClass(object):
 
 	# Processing first job in queue
 	def processJobs(self):
-		for index in range(NUM_SERVERS):
-			currentJob = self.getFirstQueued()
+		for serverID in range(NUM_SERVERS):
+			#Server not busy and queue is not empty
+			if (MachineClass.ServersBusy[serverID] == False) and (MachineClass.Queue.Size > 0):
+				currentJob = MachineClass.Queue.head.job
 
-			#Server not busy and a job is waiting is in the queue
-			if (MachineClass.ServersBusy[index] == False) and (currentJob != None): 	
-				MachineClass.ServiceStartTimes[index] = MachineClass.CurrentTime
-				MachineClass.ProcessingJobs[index] = currentJob
-				MachineClass.ServersBusy[index] = True
-				GUI.writeToConsole(self.master, "%.6f | %s processing on server %s"%(MachineClass.CurrentTime, currentJob.name, index))
-				self.removeFirstQueued()
+				MachineClass.ServiceStartTimes[serverID] = MachineClass.CurrentTime
+				MachineClass.ProcessingJobs[serverID] = currentJob
+				MachineClass.ServersBusy[serverID] = True
+				#GUI.writeToConsole(self.master, "%.6f | %s processing on server %s"%(MachineClass.CurrentTime, currentJob.name, index))
+				GUI.writeToConsole(self.master, "----------- | %s processing on server %s"%(currentJob.name, serverID))
+				MachineClass.Queue.removeHead()	# remove first job from queue
 
 	# Job completed
 	def completionEvent(self, completingJob, load, percErrorMin, percErrorMax):
 		completingJob.completionTime = MachineClass.CurrentTime
-		#self.saveJobs(completingJob, load, percErrorMin, percErrorMax)			# save to list of arrivals, for testing
+		self.calcNumJobs(self.ctr)
 
 		# Server no longer busy
 		serverIndex = MachineClass.ProcessingJobs.index(completingJob)
@@ -1020,13 +961,10 @@ class MachineClass(object):
 		MachineClass.ProcessingJobs[serverIndex] = None
 		MachineClass.ServiceStartTimes[serverIndex] = None
 
-		#MachineClass.JobOrderOut.append(completingJob.name)
-		self.calcNumJobs(self.ctr)
-		TimeSys.append(MachineClass.CurrentTime - completingJob.arrivalTime)
-		ProcTime.append(completingJob.procTime)
-		PercError.append(abs(completingJob.percentError))
-
 		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, completingJob.name))
+
+		if(MachineClass.Queue.Size > 0):
+			self.processJobs()
 
 
 	def run(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, simLength):
@@ -1047,9 +985,6 @@ class MachineClass(object):
 			# If all servers are idle, or next arrival is before completion of shortest job processing next event is ARRIVAL
 			if (all(element == False for element in MachineClass.ServersBusy)) or (MachineClass.TimeUntilArrival < minRPT):
 				MachineClass.CurrentTime += MachineClass.TimeUntilArrival
-
-				# stop server from processing current job
-				#MachineClass.ServerBusy == False
 				self.arrivalEvent(load, arrDist, procRate, procDist, percErrorMin, percErrorMax)
 			
 			#next event is job finishing (job with shortest RPT)			
@@ -1057,9 +992,6 @@ class MachineClass(object):
 				completingJob = minProcJob
 				MachineClass.CurrentTime += completingJob.RPT
 				self.completionEvent(completingJob, load, percErrorMin, percErrorMax)
-
-				if(MachineClass.Queue.Size > 0):
-					self.processJobs()
 
 			# If current time is greater than the simulation length, end program
 			if (MachineClass.CurrentTime > simLength) or (MachineClass.StopSim == True):
