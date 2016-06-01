@@ -833,10 +833,6 @@ class MachineClass(object):
 
 		NumJobs[:] = []
 		NumJobsTime[:] = []
-		TimeSys[:] = []
-		ProcTime[:] = []
-		PercError[:] = [] 
-		MachineClass.JobOrderOut[:] = []
 
 		self.ctr = 0
 
@@ -897,8 +893,6 @@ class MachineClass(object):
 		J.name = "Job%02d"%self.ctr
 
 		self.calcNumJobs(self.ctr)
-		self.saveNumJobs(MachineClass.CurrentTime, MachineClass.AvgNumJobs, load, percErrorMin, percErrorMax)
-		#self.saveArrivals(J, load, percErrorMin, percErrorMax)
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))	
 		self.updateJobs()				# update all processing jobs
