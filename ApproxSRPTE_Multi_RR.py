@@ -136,10 +136,10 @@ class GUI(Tk):
 	def printIntro(self):
 		self.writeToConsole("Approximate SRPTE \n\n This application simulates a single server with Poisson arrivals and processing times of a general distribution. There are errors in time estimates within a range. Arrivals are assigned to SRPT classes using the methods described in Adaptive and Scalable Comparison Scheduling.")
 
-	def printParams(self, numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, numClasses, simLength): 
+	def printParams(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, numClasses, simLength): 
 		self.writeToConsole("--------------------------------------------------------------------------------")
 		self.writeToConsole("PARAMETERS:")
-		self.writeToConsole("Number of Servers = %s"%numServers)
+		self.writeToConsole("Number of Servers = %s"%NUM_SERVERS)
 		self.writeToConsole("Load = %.4f"%load)
 		#self.writeToConsole("Arrival Rate = %.4f"%arrRate)
 		self.writeToConsole("Arrival Distribution = %s"%arrDist)
@@ -242,8 +242,7 @@ class GUI(Tk):
 		global NUM_SERVERS
 		NUM_SERVERS = I.valuesList[0]
 
-		self.printParams(I.valuesList[0],					#num Servers
-						 I.valuesList[1],					#load
+		self.printParams(I.valuesList[1],					#load
 						 'Exponential',						#arrival
 						 I.valuesList[2], I.distList[1], 	#processing rate
 						 I.valuesList[3],					#error min
@@ -255,8 +254,7 @@ class GUI(Tk):
 		
 		# Start process
 		MC = MachineClass(self)
-		MC.run(	I.valuesList[0],				#num Servers
-				I.valuesList[1],				#load
+		MC.run(	I.valuesList[1],				#load
 				'Exponential',					#arrival
 				I.valuesList[2], I.distList[1],	# proc
 				I.valuesList[3],				# error min
@@ -307,10 +305,10 @@ class Input(LabelFrame):
 		self.loadInput.set(0.95)       		 	   	##################################CHANGE LATER
 		#self.arrivalRateInput.set(1.0)         	 ##################################CHANGE LATER
 		self.processingRateInput.set(0.5)   	    ##################################CHANGE LATER
-		self.percentErrorMinInput.set(-50)          ##################################CHANGE LATER
+		self.percentErrorMinInput.set(0)          ##################################CHANGE LATER
 		self.percentErrorMaxInput.set(0)          ##################################CHANGE LATER
 		self.numberOfClassesInput.set(10)			##################################CHANGE LATER
-		self.simLengthInput.set(100.0)           ##################################CHANGE LATER
+		self.simLengthInput.set(150.0)           ##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=2)
 		self.grid_columnconfigure(1, weight=2)
@@ -779,7 +777,6 @@ class JobClass(object):
 	
 	def __init__(self, master):
 		self.master = master
-		self.arrivalTime = 0
 		self.completionTime = 0
 		self.procTime = 0
 		self.RPT = 0		# Real Remaining Processing Time
@@ -864,7 +861,6 @@ class JobClass(object):
 		self.estimatedProcTime = (1 + (self.generateError(percErrorMin, percErrorMax)/100.0))*self.procTime
 		self.RPT = self.procTime
 		self.ERPT = self.estimatedProcTime
-		self.arrivalTime = MachineClass.CurrentTime
 
 #----------------------------------------------------------------------#
 # Class: MachineClass
@@ -960,18 +956,12 @@ class MachineClass(object):
 
 	#update data
 	def updateJobs(self):
-		for index in range(NUM_SERVERS):
-			if(MachineClass.ProcessingJobs[index] != None):
-				serviceTime = MachineClass.CurrentTime - MachineClass.ServiceStartTimes[index]
-				MachineClass.ProcessingJobs[index].RPT -= serviceTime
-				MachineClass.ProcessingJobs[index].ERPT -= serviceTime
-
-	def saveArrivals(self, job):
-		text = "%s,%.6f,%.6f,%.6f,%s,%.6f"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.priorityClass, job.completionTime) + "\n"
-		
-		with open("Jobs.txt", "a") as myFile:
-			myFile.write(text)
-		myFile.close()
+		for serverID in range(NUM_SERVERS):
+			if(MachineClass.ProcessingJobs[serverID] != None):
+				serviceTime = MachineClass.CurrentTime - MachineClass.ServiceStartTimes[serverID]
+				MachineClass.ProcessingJobs[serverID].RPT -= serviceTime
+				MachineClass.ProcessingJobs[serverID].ERPT -= serviceTime
+				MachineClass.ServiceStartTimes[serverID] = MachineClass.CurrentTime
 
 	# Give arriving job a class and add it to the queue
 	def assignClass(self, numClasses, job, prevJobs, counterStart, counter):
@@ -1118,42 +1108,6 @@ class MachineClass(object):
 	def calcNumJobsPerClassPerServer(self):
 		pass
 
-	def saveNumJobs(self, currentTime, avgNumJobs, load, errorMin, errorMax):
-		text = "%.6f,%.6f"%(currentTime, avgNumJobs) + "\n"
-
-		if (abs(errorMin) == errorMax):
-			self.error = str(int(errorMax))
-		else:
-			self.error = str(int(errorMin)) + "_" + str(int(errorMax))
-		
-		with open("NumJobs_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
-			myFile.write(text)
-		myFile.close()		
-
-	def saveArrivals(self, job, load, errorMin, errorMax):
-		text = "%s,%.6f,%.6f,%.6f,%s"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.priorityClass) + "\n"
-	
-		if (abs(errorMin) == errorMax):
-			self.error = str(int(errorMax))
-		else:
-			self.error = str(int(errorMin)) + "_" + str(int(errorMax))	
-		
-		with open("Arrivals_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
-			myFile.write(text)
-		myFile.close()		
-
-	def saveJobs(self, job, load, errorMin, errorMax):
-		text = "%s,%.6f"%(job.name, job.completionTime) + "\n"
-	
-		if (abs(errorMin) == errorMax):
-			self.error = str(int(errorMax))
-		else:
-			self.error = str(int(errorMin)) + "_" + str(int(errorMax))
-
-		with open("Jobs_numServers=%s_load=%s_alpha=%s_error=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error), "a") as myFile:
-			myFile.write(text)
-		myFile.close()		
-
 	# Job arriving
 	def arrivalEvent(self, load, arrDist, procRate, procDist, numClasses, percErrorMin, percErrorMax):
 		J = JobClass(self.master)
@@ -1163,19 +1117,21 @@ class MachineClass(object):
 		self.calcNumJobs(self.ctr)
 		self.calcNumJobsPerClass(numClasses)
 
+		self.updateJobs()		# update all processing jobs
+
 		self.assignClass(numClasses, J, MachineClass.PreviousJobs, 0, 0)	# Give job a class, and add to queue
 		serverID = self.router(J, numClasses)								# Send job to a server queue
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s, server = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass, serverID))		
 
-		self.updateJobs()		# update all processing jobs
+
 
 		procJob = MachineClass.ProcessingJobs[serverID]
 
 		# Preempt processing job at server if new job has higher priority class
 		if (procJob != None):
 			if (J.priorityClass < procJob.priorityClass):
-				GUI.writeToConsole(self.master, "%.6f | %s preempting %s"%(MachineClass.CurrentTime, J.name, procJob.name))
+				GUI.writeToConsole(self.master, "%.6f | %s preempting %s, ERPT=%s"%(MachineClass.CurrentTime, J.name, procJob.name, procJob.ERPT))
 
 				#Remove procJob from processing
 				MachineClass.ServersBusy[serverID] = False
@@ -1209,13 +1165,12 @@ class MachineClass(object):
 				MachineClass.ServiceStartTimes[serverID] = MachineClass.CurrentTime
 				MachineClass.ProcessingJobs[serverID] = currentJob
 				MachineClass.ServersBusy[serverID] = True
-				GUI.writeToConsole(self.master, "%.6f | %s processing on server %s"%(MachineClass.CurrentTime, currentJob.name, serverID))
+				GUI.writeToConsole(self.master, "%.6f | %s processing on server %s, ERPT=%s"%(MachineClass.CurrentTime, currentJob.name, serverID, currentJob.ERPT))
 				MachineClass.ServerQueues[serverID].removeHead()
 
 	# Job completed
 	def completionEvent(self, numClasses, completingJob, load, percErrorMin, percErrorMax):
 		completingJob.completionTime = MachineClass.CurrentTime
-		self.saveJobs(completingJob, load, percErrorMin, percErrorMax)			# save to list of arrivals, for testing
 
 		self.calcNumJobs(self.ctr)
 		self.calcNumJobsPerClass(numClasses)
@@ -1232,7 +1187,7 @@ class MachineClass(object):
 			self.processJobs()
 
 
-	def run(self, numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, numClasses, simLength):
+	def run(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, numClasses, simLength):
 		while 1:
 			# Generate time of first job arrival
 			if(self.ctr == 0):
@@ -1270,7 +1225,7 @@ class MachineClass(object):
 #----------------------------------------------------------------------#
 def main():
 	window = GUI(None)                           			   # instantiate the class with no parent (None)
-	window.title('Multi-Server Approximate SRPT with Errors')  # title the window
+	window.title('Class-Based Multi-Server SRPT with Errors')  # title the window
 
 	# Global variables used in JobClass
 	main.timesClicked = 0       
