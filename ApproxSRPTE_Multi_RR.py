@@ -16,10 +16,6 @@ from math import log
 import plotly.plotly as py
 from plotly.graph_objs import Scatter
 import plotly.graph_objs as go
-#from bokeh.plotting import figure, output_file, show
-#from bokeh.charts import Bar, output_file, show
-#from collections import OrderedDict
-#import pandas
 from itertools import cycle
 
 import copy
@@ -37,9 +33,6 @@ conn=sqlite3.connect('MultiServerDatabase_ASRPTE_RR.db')
 
 NumJobs = []
 NumJobsTime = []
-TimeSys = []
-ProcTime = []
-PercError = []
 #NUM_SERVERS = 0
 
 #----------------------------------------------------------------------#
@@ -177,35 +170,6 @@ class GUI(Tk):
 		params.to_sql(name='parameters', con=conn, if_exists='append')
 		print params
 
-	# def plotNumJobsInSys(self, numClasses):
-	# 	# SCATTER PLOT
-	# 	output_file("SRPT_NumJobsInSys: Case 4")
-	# 	scatter = figure(title = "Average Number of Jobs Over Time",
-	# 					x_axis_label = "Time",
-	# 					y_axis_label = "Number of Jobs")
-	# 	#trace0.scatter(NumJobsTime, NumJobs)
-	# 	scatter.line(NumJobsTime, NumJobs)
-	# 	scatter.circle(NumJobsTime, NumJobs, size=1)
-	# 	show(scatter)
-
-
-
-	# 	#-----------------------------------------------------------------------------#
-	# 	# BLOCK DIAGRAM
-	# 	output_file("SRPT_NumJobsInSysPerClass: Case4")
-
-	# 	classRange = range(1, numClasses + 1)
-	# 	classes = [format(i,'02d') for i in classRange]
-
-	# 	# remove placeholder element
-	# 	MachineClass.NumJobsClass.pop(0)
-
-	# 	dictionary = {'number of jobs': MachineClass.NumJobsClass, 'classes': classes}
-	# 	df = pandas.DataFrame(data=dictionary)
-
-	# 	bar = Bar(df, 'classes', values='number of jobs', title="test chart")
-	# 	show(bar)
-
 	def plotNumJobsInSys(self, numClasses):
 		py.sign_in('mailacrs','wowbsbc0qo')
 		trace0 = Scatter(x=NumJobsTime, y=NumJobs)
@@ -266,41 +230,6 @@ class GUI(Tk):
 			var += (avg - i)**2
 		return var/len(List)
 
-	def displayAverageData(self, numClasses):
-		self.plotNumJobsInSys(numClasses)
-		try:
-			AvgNumJobs = int(float(sum(NumJobs))/len(NumJobs))
-		except ZeroDivisionError:
-			AvgNumJobs = 0
-
-		try:
-			AvgTimeSys = float(sum(TimeSys))/len(TimeSys)
-		except ZeroDivisionError:
-			AvgTimeSys = 0.0
-
-		try:
-			AvgProcTime = float(sum(ProcTime))/len(ProcTime)
-		except ZeroDivisionError:
-			AvgProcTime = 0.0
-
-		try:
-			VarProcTime = self.calcVariance(ProcTime, AvgProcTime)
-		except ZeroDivisionError:
-			VarProcTime = 0.0
-
-		try:
-			AvgPercError = float(sum(PercError))/len(PercError)
-		except ZeroDivisionError:
-			AvgPercError = 0.0
-
-		self.writeToConsole('\n\nAverage number of jobs in the system: %.6f' %AvgNumJobs)
-		self.writeToConsole('Average time in system, from start to completion: %.6f' %AvgTimeSys)
-		self.writeToConsole('Average processing time, based on generated service times: %.6f' %AvgProcTime)
-		self.writeToConsole('Variance of processing time: %.6f' %VarProcTime)
-		self.writeToConsole('Average percent error: %.2f\n' %AvgPercError)
-		#self.writeToConsole('Request order: %s' % ArrivalClass.JobOrderIn)
-		#self.writeToConsole('Service order: %s\n\n' % MachineClass.JobOrderOut)
-
 	def stopSimulation(self, event):
 		MachineClass.StopSim = True
 				
@@ -349,8 +278,6 @@ class GUI(Tk):
 					JobClass.BPArray[1],			# lower
 					JobClass.BPArray[2])			# upper				
 
-		#self.displayAverageData(I.valuesList[5])
-		#self.saveData()
 		self.updateStatusBar("Simulation complete.")
 
 
@@ -1007,9 +934,6 @@ class MachineClass(object):
 
 		NumJobs[:] = []
 		NumJobsTime[:] = []
-		TimeSys[:] = []
-		ProcTime[:] = []
-		PercError[:] = [] 
 	
 		self.ctr = 0
 
@@ -1116,7 +1040,7 @@ class MachineClass(object):
 		# If job is in the last class, sort by LCFS
 		if (job.priorityClass == (numClasses - 1)):
 			MachineClass.ServerQueues[serverID].insertByLCFS(job, numClasses);
-			GUI.writeToConsole(self.master, "sending job %s, class %s to server %s LCFS"%(job.name, job.priorityClass, serverID))
+			#GUI.writeToConsole(self.master, "sending job %s, class %s to server %s LCFS"%(job.name, job.priorityClass, serverID))
 
 		else:
 			# Add current job with new class to queue 
@@ -1236,7 +1160,6 @@ class MachineClass(object):
 		J.setJobAttributes(load, procRate, procDist, percErrorMin, percErrorMax, MachineClass.CurrentTime)
 		J.name = "Job%02d"%self.ctr
 		
-
 		self.calcNumJobs(self.ctr)
 		self.calcNumJobsPerClass(numClasses)
 
@@ -1271,8 +1194,8 @@ class MachineClass(object):
 					#GUI.writeToConsole(self.master, "%.6f | %s added back to server %s  by class, class = %s"%(MachineClass.CurrentTime, procJob.name, serverID, procJob.priorityClass))
 				
 
-		self.saveNumJobs(MachineClass.CurrentTime, MachineClass.AvgNumJobs, load, percErrorMin, percErrorMax)
-		self.saveArrivals(J, load, percErrorMin, percErrorMax)
+		#self.saveNumJobs(MachineClass.CurrentTime, MachineClass.AvgNumJobs, load, percErrorMin, percErrorMax)
+		#self.saveArrivals(J, load, percErrorMin, percErrorMax)
 		self.processJobs()		# process first job in each queue
 
 		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, arrDist)
@@ -1304,10 +1227,6 @@ class MachineClass(object):
 		MachineClass.ServersBusy[serverID] = False
 		MachineClass.ProcessingJobs[serverID] = None
 		MachineClass.ServiceStartTimes[serverID] = None
-
-		TimeSys.append(MachineClass.CurrentTime - completingJob.arrivalTime)
-		ProcTime.append(completingJob.procTime)
-		PercError.append(abs(completingJob.percentError))
 
 		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED at server %s"%(MachineClass.CurrentTime, completingJob.name, serverID))
 
