@@ -854,7 +854,7 @@ class JobClass(object):
 		return self.percentError
 
 	# Sets all processing times for job
-	def setJobAttributes(self, load, procRate, procDist, percErrorMin, percErrorMax, jobArrival):
+	def setJobAttributes(self, load, procRate, procDist, percErrorMin, percErrorMax):
 		if(procDist == 'Bounded Pareto'):
 			self.procTime = self.setServiceDist(procRate, procDist) 		#use updated proc rate
 			self.setArrProcRates(load, procRate, procDist)
@@ -864,7 +864,7 @@ class JobClass(object):
 		self.estimatedProcTime = (1 + (self.generateError(percErrorMin, percErrorMax)/100.0))*self.procTime
 		self.RPT = self.procTime
 		self.ERPT = self.estimatedProcTime
-		self.arrivalTime = jobArrival
+		self.arrivalTime = MachineClass.CurrentTime
 
 #----------------------------------------------------------------------#
 # Class: MachineClass
@@ -1157,7 +1157,7 @@ class MachineClass(object):
 	# Job arriving
 	def arrivalEvent(self, load, arrDist, procRate, procDist, numClasses, percErrorMin, percErrorMax):
 		J = JobClass(self.master)
-		J.setJobAttributes(load, procRate, procDist, percErrorMin, percErrorMax, MachineClass.CurrentTime)
+		J.setJobAttributes(load, procRate, procDist, percErrorMin, percErrorMax)
 		J.name = "Job%02d"%self.ctr
 		
 		self.calcNumJobs(self.ctr)
@@ -1194,8 +1194,6 @@ class MachineClass(object):
 					#GUI.writeToConsole(self.master, "%.6f | %s added back to server %s  by class, class = %s"%(MachineClass.CurrentTime, procJob.name, serverID, procJob.priorityClass))
 				
 
-		#self.saveNumJobs(MachineClass.CurrentTime, MachineClass.AvgNumJobs, load, percErrorMin, percErrorMax)
-		#self.saveArrivals(J, load, percErrorMin, percErrorMax)
 		self.processJobs()		# process first job in each queue
 
 		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, arrDist)
@@ -1255,16 +1253,12 @@ class MachineClass(object):
 			# If all servers are idle, or next arrival is before completion of shortest job processing next event is ARRIVAL
 			if (all(element == False for element in MachineClass.ServersBusy)) or (MachineClass.TimeUntilArrival < minRPT):
 				MachineClass.CurrentTime += MachineClass.TimeUntilArrival
-
-				# stop server from processing current job
-				#MachineClass.ServerBusy == False
 				self.arrivalEvent(load, arrDist, procRate, procDist, numClasses, percErrorMin, percErrorMax)
 
 			#next event is job finishing (job with shortest RPT)			
 			else:
 				completingJob = minProcJob
 				MachineClass.CurrentTime += completingJob.RPT
-
 				self.completionEvent(numClasses, completingJob, load, percErrorMin, percErrorMax)
 
 			# If current time is greater than the simulation length, end program
