@@ -248,9 +248,9 @@ class GUI(Tk):
 
 		self.saveParams(I.valuesList[0],				#num Servers
 						I.valuesList[1],				#load
-						I.valuesList[2],							# arrival rate
+						'?',							# arrival rate
 						'Exponential',					# arrival dist
-						I.valuesList[3], I.distList[1],	# processing
+						'?', I.distList[1],				# processing
 						I.valuesList[4], 				# error min
 						I.valuesList[5],				# error max
 						I.valuesList[6],				# sim time
@@ -293,7 +293,7 @@ class Input(LabelFrame):
 		self.loadInput.set(self.loadDefault)
 		#self.arrivalRateInput.set(self.arrRateDefault)
 		self.processingRateInput.set(self.procRateDefault)
-		self.percentErrorMinInput.set(0)
+		self.percentErrorMinInput.set(-50)
 		self.percentErrorMaxInput.set(0)
 		self.simLengthInput.set(4000.0)
 
@@ -773,7 +773,7 @@ class JobClass(object):
 
 	# Generates a percent error for processing time
 	def generateError(self, percErrorMin, percErrorMax):
-		self.percentError = random.randint(percErrorMin, percErrorMax)
+		self.percentError = random.uniform(percErrorMin, percErrorMax)
 		return self.percentError
 
 	# Sets all processing times for job
@@ -959,6 +959,10 @@ class MachineClass(object):
 
 		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED at server %s"%(MachineClass.CurrentTime, completingJob.name, serverID))
 
+		#Update other processing jobs (in case next event should be completion)
+		self.updateJobs()
+
+		#If there is a job waiting for this server, process it
 		if(MachineClass.Queue.Size > 0):
 			self.processJobs()
 

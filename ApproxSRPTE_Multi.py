@@ -16,10 +16,10 @@ from math import log
 #import plotly.plotly as py
 #from plotly.graph_objs import Scatter
 #import plotly.graph_objs as go
-from bokeh.plotting import figure, output_file, show
-from bokeh.charts import Bar, output_file, show
-from collections import OrderedDict
+import sqlite3
 import pandas
+
+conn=sqlite3.connect('MultiServerDatabase_SRPT.db')
 
 import copy
 import random
@@ -923,7 +923,6 @@ class MachineClass(object):
 
 	def __init__(self, master):
 		self.master = master
-		MachineClass.Queue.clear()
 		MachineClass.PreviousJobs[:] = []
 		MachineClass.LastClassPrevJobs[:] = []
 		MachineClass.CurrentTime = 0.0
@@ -936,7 +935,8 @@ class MachineClass(object):
 
 		MachineClass.ServiceStartTimes = [None] * NUM_SERVERS	# Start times of job in each server
 		MachineClass.ProcessingJobs = [None] * NUM_SERVERS		# Array of current job in each server
-		MachineClass.ServersBusy = [False] * NUM_SERVERS			# Array of whether each server is busy	
+
+		MachineClass.ServersBusy = [False] * NUM_SERVERS		# Array of whether each server is busy	
 
 
 		MachineClass.PrevTime = 0
@@ -978,12 +978,41 @@ class MachineClass(object):
 				MachineClass.ProcessingJobs[index].RPT -= serviceTime
 				MachineClass.ProcessingJobs[index].ERPT -= serviceTime
 
-	def saveArrivals(self, job):
-		text = "%s,       %.4f,      %.4f,      %.4f,      %s"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.priorityClass) + "\n"
+	def saveNumJobs(self, currentTime, avgNumJobs, load, errorMin, errorMax):
+		text = "%.6f,%.6f"%(currentTime, avgNumJobs) + "\n"
+
+		if (abs(errorMin) == errorMax):
+			self.error = str(int(errorMax))
+		else:
+			self.error = str(int(errorMin)) + "_" + str(int(errorMax))
 		
-		with open("Arrivals.txt", "a") as myFile:
+		with open("NumJobs_numServers=%s_load=%s_alpha=%s_error=%s_numClasses=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error, numClasses), "a") as myFile:
+			myFile.write(text)
+		myFile.close()		
+
+	def saveArrivals(self, job, load, errorMin, errorMax):
+		text = "%s,%.6f,%.6f,%.6f"%(job.name, job.arrivalTime, job.RPT, job.ERPT, job.priorityClass) + "\n"
+	
+		if (abs(errorMin) == errorMax):
+			self.error = str(int(errorMax))
+		else:
+			self.error = str(int(errorMin)) + "_" + str(int(errorMax))	
+		
+		with open("Arrivals_numServers=%s_load=%s_alpha=%s_error=%s_numClasses=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error, numClasses), "a") as myFile:
 			myFile.write(text)
 		myFile.close()
+
+	def saveJobs(self, job, load, errorMin, errorMax, numClasses):
+		text = "%s,%.6f"%(job.name, job.completionTime) + "\n"
+	
+		if (abs(errorMin) == errorMax):
+			self.error = str(int(errorMax))
+		else:
+			self.error = str(int(errorMin)) + "_" + str(int(errorMax))
+
+		with open("Jobs_numServers=%s_load=%s_alpha=%s_error=%s_numClasses=%s.xls"%(NUM_SERVERS, load, JobClass.BPArray[0], self.error, numClasses), "a") as myFile:
+			myFile.write(text)
+		myFile.close()				
 
 	# Give arriving job a class and add it to the queue
 	def assignClass(self, numClasses, job, prevJobs, counterStart, counter):
@@ -1009,16 +1038,17 @@ class MachineClass(object):
 	# Router sends job to servers and adds job to their queue
 	# Compare to server last routed to of the same class, send to next one
 	def router(self, job, numClasses):
-		lastRoutedTo = [None] * (numClassesEntry + 1)		#List of last server jobs sent to from each class
+		lastRoutedTo = [0] * (numClasses + 1)		#List of last server jobs sent to from each class
+		print lastRoutedTo
 
 		for index in range(len(lastRoutedTo)):
 			if (job.priorityClass == index):
 				lastRoutedTo[index] += 1					# update last routed to
-				self.sendJobToServer(job, index)
+				self.sendJobToServer(job, index, numClasses)
 
 
 	# Send job to server i
-	def sendJobToServer(self, job, i):
+	def sendJobToServer(self, job, i, numClasses):
 
 		
 
@@ -1090,18 +1120,19 @@ class MachineClass(object):
 		self.calcNumJobsPerClass(numClasses)
 
 		self.assignClass(numClasses, J, MachineClass.PreviousJobs, 0, 1)			# give job a class, and add to queue
-		self.saveArrivals(J)					# save to list of arrivals, for testing
 		if(MachineClass.Queue.Size > 0):
-			self.updateJob()	# update data in queue	
+			self.updateJobs()	# update data in queue	
 
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass))
-		self.processJob()						# process first job in queue
+		self.saveNumJobs(MachineClass.CurrentTime, MachineClass.AvgNumJobs, load, percErrorMin, percErrorMax, MachineClass.AvgNumJobsArray)
+		self.saveArrivals(J, load, percErrorMin, percErrorMax)
+		self.processJobs()						# process first job in queue
 
 		MachineClass.NextArrival = MachineClass.CurrentTime + self.setArrivalDist(J.arrivalRate, arrDist) # generate next arrival
 
 	# Processing first job in queue
-	def processJob(self):
+	def processJobs(self):
 		for index in range(NUM_SERVERS):
 			currentJob = self.getFirstQueued()
 
@@ -1114,22 +1145,31 @@ class MachineClass(object):
 				self.removeFirstQueued()
 
 	# Job completed
-	def completionEvent(self, numClasses):
-		MachineClass.JobOrderOut.append(MachineClass.JobInService.name)
+	def completionEvent(self, numClasses, completingJob):
+		#MachineClass.JobOrderOut.append(MachineClass.JobInService.name)
+		self.saveJobs(completingJob, load, percErrorMin, percErrorMax)			# save to list of arrivals, for testing
+
+		# Server no longer busy
+		serverIndex = MachineClass.ProcessingJobs.index(completingJob)
+		MachineClass.ServersBusy[serverIndex] = False
+		MachineClass.ProcessingJobs[serverIndex] = None
+		MachineClass.ServiceStartTimes[serverIndex] = None
+		if(MachineClass.Queue.Size > 0):
+			self.processJobs()		
 
 		self.calcNumJobs(self.ctr)
 		self.calcNumJobsPerClass(numClasses)
-		NumJobs.append(MachineClass.AvgNumJobs)				# y axis of plot
-		NumJobsTime.append(MachineClass.CurrentTime)		# x axis of plot
+		#NumJobs.append(MachineClass.AvgNumJobs)				# y axis of plot
+		#NumJobsTime.append(MachineClass.CurrentTime)		# x axis of plot
 		TimeSys.append(MachineClass.CurrentTime - MachineClass.JobInService.arrivalTime)
 		ProcTime.append(MachineClass.JobInService.procTime)
 		PercError.append(abs(MachineClass.JobInService.percentError))
 
 		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED"%(MachineClass.CurrentTime, MachineClass.JobInService.name))
-		MachineClass.ServerBusy = False
-		MachineClass.JobInService = None
+		#MachineClass.ServerBusy = False
+		#MachineClass.JobInService = None
 		
-		MachineClass.Queue.removeHead()		 # remove job from queue		
+		#MachineClass.Queue.removeHead()		 # remove job from queue		
 
 
 	def run(self, numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, numClasses, simLength):
@@ -1150,9 +1190,6 @@ class MachineClass(object):
 				#next event is job finishing
 				MachineClass.CurrentTime = MachineClass.ServiceFinishTime
 				self.completionEvent(numClasses)
-
-				if(MachineClass.Queue.Size > 0):
-					self.processJob()
 
 			# If current time is greater than the simulation length, end program
 			if (MachineClass.CurrentTime > simLength) or (MachineClass.StopSim == True):

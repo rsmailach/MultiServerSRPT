@@ -262,8 +262,6 @@ class GUI(Tk):
 				I.valuesList[5],				# num class
 				I.valuesList[6])				# sim time
 
-		self.plotNumJobsInSys(I.valuesList[5])
-
 		self.saveParams(I.valuesList[1],		#load
 					'?', 						# arrival rate
 					'Exponential',					# arrival dist
@@ -276,6 +274,7 @@ class GUI(Tk):
 					JobClass.BPArray[1],			# lower
 					JobClass.BPArray[2])			# upper				
 
+		self.plotNumJobsInSys(I.valuesList[5])
 		self.updateStatusBar("Simulation complete.")
 
 
@@ -305,7 +304,7 @@ class Input(LabelFrame):
 		self.loadInput.set(0.95)       		 	   	##################################CHANGE LATER
 		#self.arrivalRateInput.set(1.0)         	 ##################################CHANGE LATER
 		self.processingRateInput.set(0.5)   	    ##################################CHANGE LATER
-		self.percentErrorMinInput.set(0)          ##################################CHANGE LATER
+		self.percentErrorMinInput.set(-50)          ##################################CHANGE LATER
 		self.percentErrorMaxInput.set(0)          ##################################CHANGE LATER
 		self.numberOfClassesInput.set(10)			##################################CHANGE LATER
 		self.simLengthInput.set(150.0)           ##################################CHANGE LATER
@@ -847,7 +846,7 @@ class JobClass(object):
 
 	# Generates a percent error for processing time
 	def generateError(self, percErrorMin, percErrorMax):
-		self.percentError = random.randint(percErrorMin, percErrorMax)
+		self.percentError = random.uniform(percErrorMin, percErrorMax)
 		return self.percentError
 
 	# Sets all processing times for job
@@ -1121,17 +1120,14 @@ class MachineClass(object):
 
 		self.assignClass(numClasses, J, MachineClass.PreviousJobs, 0, 0)	# Give job a class, and add to queue
 		serverID = self.router(J, numClasses)								# Send job to a server queue
+		procJob = MachineClass.ProcessingJobs[serverID]
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s, server = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass, serverID))		
-
-
-
-		procJob = MachineClass.ProcessingJobs[serverID]
 
 		# Preempt processing job at server if new job has higher priority class
 		if (procJob != None):
 			if (J.priorityClass < procJob.priorityClass):
-				GUI.writeToConsole(self.master, "%.6f | %s preempting %s, ERPT=%s"%(MachineClass.CurrentTime, J.name, procJob.name, procJob.ERPT))
+				GUI.writeToConsole(self.master, "%.6f | %s preempting %s"%(MachineClass.CurrentTime, J.name, procJob.name))
 
 				#Remove procJob from processing
 				MachineClass.ServersBusy[serverID] = False
@@ -1149,7 +1145,7 @@ class MachineClass(object):
 					MachineClass.ServerQueues[serverID].insertByClass(procJob)				# add job to queue
 					#GUI.writeToConsole(self.master, "%.6f | %s added back to server %s  by class, class = %s"%(MachineClass.CurrentTime, procJob.name, serverID, procJob.priorityClass))
 				
-
+		
 		self.processJobs()		# process first job in each queue
 
 		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, arrDist)
@@ -1165,7 +1161,7 @@ class MachineClass(object):
 				MachineClass.ServiceStartTimes[serverID] = MachineClass.CurrentTime
 				MachineClass.ProcessingJobs[serverID] = currentJob
 				MachineClass.ServersBusy[serverID] = True
-				GUI.writeToConsole(self.master, "%.6f | %s processing on server %s, ERPT=%s"%(MachineClass.CurrentTime, currentJob.name, serverID, currentJob.ERPT))
+				GUI.writeToConsole(self.master, "%.6f | %s processing on server %s"%(MachineClass.CurrentTime, currentJob.name, serverID))
 				MachineClass.ServerQueues[serverID].removeHead()
 
 	# Job completed
@@ -1183,6 +1179,10 @@ class MachineClass(object):
 
 		GUI.writeToConsole(self.master, "%.6f | %s COMPLTED at server %s"%(MachineClass.CurrentTime, completingJob.name, serverID))
 
+		#Update other processing jobs (in case next event should be completion)
+		self.updateJobs()
+
+		#If there is a job waiting for this server, process it
 		if (MachineClass.ServerQueues[serverID].Size > 0):
 			self.processJobs()
 
@@ -1197,13 +1197,13 @@ class MachineClass(object):
 
 			# Find shortest RPT of all processing jobs		
 			try:
-				minRPT = min(element.RPT for element in MachineClass.ProcessingJobs if element is not None)
-				l = [x for x in MachineClass.ProcessingJobs if (x is not None and x.RPT == minRPT)]
+				minRPT = min(element.RPT for element in MachineClass.ProcessingJobs if element is not None) # gets min rpt value
+				l = [x for x in MachineClass.ProcessingJobs if (x is not None and x.RPT == minRPT)]			# searches for job wiht min rpt value
 				minProcJob = l[0]
+				#GUI.writeToConsole(self.master, "%.4F || Min proc job %s, RPT=%s, ERPT=%s"%(MachineClass.CurrentTime, minProcJob.name, minProcJob.RPT, minProcJob.ERPT))
 			except ValueError:
 				minRPT = -1	
 				minProcJob = None				
-
 
 			# If all servers are idle, or next arrival is before completion of shortest job processing next event is ARRIVAL
 			if (all(element == False for element in MachineClass.ServersBusy)) or (MachineClass.TimeUntilArrival < minRPT):
