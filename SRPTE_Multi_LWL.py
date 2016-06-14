@@ -1,5 +1,5 @@
 #----------------------------------------------------------------------#
-# ApproxSRPTE_Multi_RR.py
+# SRPTE_Multi_LWL.py
 #
 # This application simulates multiple server with Poisson arrivals
 # and processing times of a general distribution. There are errors in

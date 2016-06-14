@@ -25,6 +25,7 @@ import ttk
 import tkFileDialog
 import csv
 import operator
+import sympy
 
 import sqlite3
 import pandas
@@ -613,6 +614,9 @@ class BoundedParetoDist(object):
 		self.b=Button(frame3,text='Ok',command=self.cleanup)
 		self.b.pack()
 
+		
+		self.setupFunction()
+
 	def cleanup(self):
 		if(self.checkParams() == 0):
 			self.paramArray=BoundedParetoDist.Array
@@ -630,6 +634,12 @@ class BoundedParetoDist(object):
 			self.errorMessage.set("")
 			BoundedParetoDist.Array = [self.a, self.l, self.u]
 			return 0
+
+	def setupFunction(self):
+		x, U, L, alpha = sympy.symbols('x U L alpha')
+		paretoNumerator = -(x*(U**alpha) - x*(L**alpha) - (U**alpha))
+		paretoDenominator = (U**alpha) * (L**alpha)
+		BoundedParetoDist.Function = (paretoNumerator/paretoDenominator)**(-1/alpha)
 
 		
 #----------------------------------------------------------------------#
@@ -832,16 +842,10 @@ class JobClass(object):
 			self.U = float(self.popup.paramArray[2])		# Largest job size
 			JobClass.BPArray = [self.alpha, self.L, self.U]
 	
-		x = random.uniform(0.0, 1.0)
-		# reassigning 
-		alpha = JobClass.BPArray[0]
-		L = JobClass.BPArray[1]
-		U = JobClass.BPArray[2]
 
-		paretoNumerator = float(-(x*(U**alpha) - x*(L**alpha) - (U**alpha)))
-		paretoDenominator = float((U**alpha) * (L**alpha))
-		main.customEquation = (paretoNumerator/paretoDenominator)**(-1/alpha)
-		
+		# Sub in to solve
+		main.customEquation = BoundedParetoDist.Function.subs(dict(x=random.uniform(0.0, 1.0), alpha = JobClass.BPArray[0],
+		L = JobClass.BPArray[1], U = JobClass.BPArray[2]))
 		return main.customEquation
 
 	# Generates a percent error for processing time
@@ -954,18 +958,44 @@ class MachineClass(object):
 				MachineClass.ServiceStartTimes[serverID] = MachineClass.CurrentTime
 
 	# Give arriving job a class and add it to the queue
-	def assignClass(self, numClasses, job, prevJobs, counterStart, counter):
-		# f(x) is desnity of processing times
+	def setThreshold(self):
+		# f(x) is probability density of processing times 
+		# Using Bounded Pareto,
+			# f(x) = {0 if x < 0, main.customEquation if x >= 0}
+		# Probability jobs will be in class 1, ie. their processing time will be between Lower and Threshold
+		# Prob(Lower <= procTime <= Threshold) = integral{from L to T}f(x)dx >> 0.8 (should be very close to 1)
+		# Most jobs will be small, only a few will be big
+
+		# ???
 		# lambda * integral{from L to U} x*f(x) dx < numServers
 
 		#HOW TO FIND THRESHOLD
 		# integral{from L to T} x*f(x)dx / integral{from L to U} x*f(x)dx = 0.8 (becasue 80% of jobs will be small)
 		# solve for T
+		x, L, U, T = sympy.symbols('x L U T', real=True)
+		
+		numerator = sympy.integrate((x*BoundedParetoDist.Function), (x, L, T))
+		print "numerator"
+		print numerator
 
-		#Probability jobs will be in class 1, ie. their processing time will be between Lower and Threshold
-		# Prob(Lower <= procTime <= Threshold) = integral{from L to T}f(x)dx >> 0.8 (should be very close to 1)
-		# Most jobs will be small, only a few will be big
+		denominator = sympy.integrate(x*BoundedParetoDist.Function, (x, L, U))
+		print "denominator"
+		print denominator
+		expected = numerator/denominator
+		print "expected"
+		print expected
+		expected = expected.subs(dict(alpha=JobClass.BPArray[0], L=JobClass.BPArray[1], U=JobClass.BPArray[2]))
+		print "expected subed"
+		print expected
+		
+		#Equate expected = 0.8, solve for T
+		threshold = sympy.solve(sympy.Eq(expected, 0.8), T)
+		print threshold
 
+		
+
+	def assignClass(self, numClasses, job, prevJobs, counterStart, counter):
+		pass
 
 	# Router sends job to servers and adds job to their queue
 	# Compare to server last routed to of the same class, send to next one
@@ -1091,6 +1121,9 @@ class MachineClass(object):
 		J = JobClass(self.master)
 		J.setJobAttributes(load, procRate, procDist, percErrorMin, percErrorMax)
 		J.name = "Job%02d"%self.ctr
+
+		if (self.ctr == 0):
+			self.setThreshold()
 		
 		self.calcNumJobs(self.ctr)
 		self.calcNumJobsPerClass(numClasses)

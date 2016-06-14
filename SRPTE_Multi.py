@@ -295,7 +295,7 @@ class Input(LabelFrame):
 		self.processingRateInput.set(self.procRateDefault)
 		self.percentErrorMinInput.set(-50)
 		self.percentErrorMaxInput.set(0)
-		self.simLengthInput.set(4000.0)
+		self.simLengthInput.set(1000000.0)
 
 		self.grid_columnconfigure(0, weight=2)
 		self.grid_columnconfigure(1, weight=2)

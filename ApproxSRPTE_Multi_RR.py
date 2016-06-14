@@ -301,13 +301,13 @@ class Input(LabelFrame):
 		self.comboboxVal = StringVar()
 
 		self.numServersInput.set(2)					##################################CHANGE LATER	
-		self.loadInput.set(0.95)       		 	   	##################################CHANGE LATER
+		self.loadInput.set(0.90)       		 	   	##################################CHANGE LATER
 		#self.arrivalRateInput.set(1.0)         	 ##################################CHANGE LATER
 		self.processingRateInput.set(0.5)   	    ##################################CHANGE LATER
 		self.percentErrorMinInput.set(-50)          ##################################CHANGE LATER
 		self.percentErrorMaxInput.set(0)          ##################################CHANGE LATER
 		self.numberOfClassesInput.set(10)			##################################CHANGE LATER
-		self.simLengthInput.set(150.0)           ##################################CHANGE LATER
+		self.simLengthInput.set(1000000.0)           ##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=2)
 		self.grid_columnconfigure(1, weight=2)
