@@ -617,8 +617,7 @@ class LinkedList(object):
 		self.head = head
 		LinkedList.NumJobArrayByClass[:] = []
 		LinkedList.Count = 0
-		self.Size = 0
-		self.workLeft = 0		
+		self.Size = 0	
 
 	# Insert job into queue (sorted by ERPT)
 	def insertByERPT(self, job):
@@ -819,7 +818,7 @@ class MachineClass(object):
 		MachineClass.ServiceStartTimes = [None] * NUM_SERVERS
 		MachineClass.ProcessingJobs = [None] * NUM_SERVERS
 		MachineClass.ServersBusy = [False] * NUM_SERVERS
-		MachineClass.WorkLeft = [0] * NUM_SERVERS
+		MachineClass.WorkLeft = [0.0] * NUM_SERVERS
 
 		MachineClass.NextRoutedTo[:] = []
 
@@ -872,7 +871,6 @@ class MachineClass(object):
 	# Router sends job to servers and adds job to their queue
 	# Compare to server last routed to of the same class, send to next one
 	def router(self, job):
-		GUI.writeToConsole(self.master, "Work left array %s"%MachineClass.WorkLeft)
 		# Get serverID where there is min work left
 		serverID = MachineClass.WorkLeft.index(min(MachineClass.WorkLeft))
 				
@@ -896,7 +894,7 @@ class MachineClass(object):
 		# Add current job with new class to queue 
 		MachineClass.ServerQueues[serverID].insertByERPT(job)				# add job to queue
 		MachineClass.WorkLeft[serverID] += job.ERPT
-		GUI.writeToConsole(self.master, "sending job %s, ERPT %s to server %s"%(job.name, job.ERPT, serverID))
+		#GUI.writeToConsole(self.master, "sending job %s, ERPT %s to server %s"%(job.name, job.ERPT, serverID))
 
 	def calcNumJobs(self, jobID):
 		self.currentNumJobs = 0
@@ -943,11 +941,12 @@ class MachineClass(object):
 		procJob = MachineClass.ProcessingJobs[serverID]
 
 		GUI.writeToConsole(self.master, "%.6f | %s arrived, erpt = %s, server = %s"%(MachineClass.CurrentTime, J.name, J.ERPT, serverID))		
+		GUI.writeToConsole(self.master, "---------- | Work left array %s"%(MachineClass.WorkLeft))		
 
 		# Preempt processing job at server if new job has higher priority class
 		if (procJob != None):
 			if (J.ERPT < procJob.ERPT):
-				GUI.writeToConsole(self.master, "%.6f | %s preempting %s"%(MachineClass.CurrentTime, J.name, procJob.name))
+				GUI.writeToConsole(self.master, "---------- | %s preempting %s"%(J.name, procJob.name))
 
 				#Remove procJob from processing
 				MachineClass.ServersBusy[serverID] = False
@@ -956,7 +955,7 @@ class MachineClass(object):
 
 				# Add preempted job back to queue
 				MachineClass.ServerQueues[serverID].insertByERPT(procJob);
-				GUI.writeToConsole(self.master, "%.6f | %s added back to server %s by ERPT=%s"%(MachineClass.CurrentTime, procJob.name, serverID, procJob.ERPT))
+				GUI.writeToConsole(self.master, "---------- | %s added back to server %s by ERPT=%s"%(procJob.name, serverID, procJob.ERPT))
 
 				
 		
@@ -975,7 +974,7 @@ class MachineClass(object):
 				MachineClass.ServiceStartTimes[serverID] = MachineClass.CurrentTime
 				MachineClass.ProcessingJobs[serverID] = currentJob
 				MachineClass.ServersBusy[serverID] = True
-				GUI.writeToConsole(self.master, "%.6f | %s processing on server %s"%(MachineClass.CurrentTime, currentJob.name, serverID))
+				GUI.writeToConsole(self.master, "---------- | %s processing on server %s"%(currentJob.name, serverID))
 				MachineClass.ServerQueues[serverID].removeHead()
 
 	# Job completed
