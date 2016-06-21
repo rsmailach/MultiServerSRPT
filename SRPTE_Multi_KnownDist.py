@@ -13,28 +13,25 @@
 from Tkinter import *
 from datetime import datetime
 from math import log
+
 import plotly.plotly as py
-from plotly.graph_objs import Scatter
 import plotly.graph_objs as go
+from plotly.graph_objs import Scatter
 from itertools import cycle
 
-import copy
 import random
 import tkMessageBox
 import ttk
 import tkFileDialog
-import csv
-import operator
 import sympy
 
 import sqlite3
 import pandas
 
-conn=sqlite3.connect('MultiServerDatabase_ASRPTE_RR.db')
+conn=sqlite3.connect('MultiServerDatabase_SRPTE_KnownDist.db')
 
 NumJobs = []
 NumJobsTime = []
-#NUM_SERVERS = 0
 
 #----------------------------------------------------------------------#
 # Class: GUI
@@ -164,8 +161,7 @@ class GUI(Tk):
 									'percErrorMax' : [percErrorMax],
 									'numClasses' : [numClasses],
 									'simLength' : [simLength],
-									'avgNumJobs' : [MachineClass.AvgNumJobs],
-									#'avgNumJobsClass' : [MachineClass.AvgNumJobsClass]
+									'avgNumJobs' : [MachineClass.AvgNumJobs]
 									})
 
 		params.to_sql(name='parameters', con=conn, if_exists='append')
@@ -195,7 +191,7 @@ class GUI(Tk):
 		)
 		)
 		fig = go.Figure(data=data, layout=layout)
-		unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys')
+		unique_url = py.plot(fig, filename = 'SRPT_NumJobs')
 
 		#-----------------------------------------------------------------------------#
 		# Average jobs/class
@@ -223,7 +219,7 @@ class GUI(Tk):
 		)
 		)
 		fig1 = go.Figure(data=data1, layout=layout1)
-		unique_url1 = py.plot(fig1, filename = 'SRPT_NumJobsInSysPerClass')
+		unique_url1 = py.plot(fig1, filename = 'SRPT_NumJobsPerClass')
 
 	def calcVariance(self, List, avg):
 		var = 0
@@ -265,16 +261,17 @@ class GUI(Tk):
 
 		self.saveParams(I.valuesList[1],		#load
 					'?', 						# arrival rate
-					'Exponential',					# arrival dist
-					'?', I.distList[1],	# processing
-					I.valuesList[3], 				# error min
-					I.valuesList[4],				# error max
-					I.valuesList[5], 				# num classes
-					I.valuesList[6],				# sim time
-					JobClass.BPArray[0],			# alpha
-					JobClass.BPArray[1],			# lower
-					JobClass.BPArray[2])			# upper				
-
+					'Exponential',				# arrival dist
+					'?',						# proc rate
+					I.distList[1],				# processing dist
+					I.valuesList[3], 			# error min
+					I.valuesList[4],			# error max
+					I.valuesList[5], 			# num classes
+					I.valuesList[6],			# sim time
+					JobClass.BPArray[0],		# alpha
+					JobClass.BPArray[1],		# lower
+					JobClass.BPArray[2])		# upper	
+ 		print "DONE SAVING..."
 		self.plotNumJobsInSys(I.valuesList[5])
 		self.updateStatusBar("Simulation complete.")
 
@@ -305,10 +302,10 @@ class Input(LabelFrame):
 		self.loadInput.set(0.90)       		 	   	##################################CHANGE LATER
 		#self.arrivalRateInput.set(1.0)         	 ##################################CHANGE LATER
 		self.processingRateInput.set(0.5)   	    ##################################CHANGE LATER
-		self.percentErrorMinInput.set(-50)          ##################################CHANGE LATER
+		self.percentErrorMinInput.set(0)          ##################################CHANGE LATER
 		self.percentErrorMaxInput.set(0)          ##################################CHANGE LATER
 		self.numberOfClassesInput.set(2)			##################################CHANGE LATER
-		self.simLengthInput.set(1000000.0)           ##################################CHANGE LATER
+		self.simLengthInput.set(5000.0)           ##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=2)
 		self.grid_columnconfigure(1, weight=2)
@@ -972,30 +969,29 @@ class MachineClass(object):
 		#HOW TO FIND THRESHOLD
 		# integral{from L to T} x*f(x)dx / integral{from L to U} x*f(x)dx = 0.8 (becasue 80% of jobs will be small)
 		# solve for T
-		x, L, U, T = sympy.symbols('x L U T', real=True)
+		x, L, U, T, alpha= sympy.symbols('x L U T alpha', real=True)
 		
 		numerator = sympy.integrate((x*BoundedParetoDist.Function), (x, L, T))
-		print "numerator"
-		print numerator
-
 		denominator = sympy.integrate(x*BoundedParetoDist.Function, (x, L, U))
-		print "denominator"
-		print denominator
 		expected = numerator/denominator
-		print "expected"
-		print expected
-		expected = expected.subs(dict(alpha=JobClass.BPArray[0], L=JobClass.BPArray[1], U=JobClass.BPArray[2]))
-		print "expected subed"
-		print expected
+
+		#expected = expected.subs(dict(alpha=JobClass.BPArray[0], L=JobClass.BPArray[1], U=JobClass.BPArray[2]))
+		expected = expected.subs([(alpha, JobClass.BPArray[0]), (L, JobClass.BPArray[1]), (U, JobClass.BPArray[2])])
+		#print "expected subed"
+		#print expected
 		
 		#Equate expected = 0.8, solve for T
-		threshold = sympy.solve(sympy.Eq(expected, 0.8), T)
-		print threshold
+		thresholdRange = sympy.solve(sympy.Eq(expected, 0.8), T)
+		MachineClass.Threshold = thresholdRange[1] #set only positive number
+		GUI.writeToConsole(self.master, "Class threshold = %s"%MachineClass.Threshold)
 
 		
 
-	def assignClass(self, numClasses, job, prevJobs, counterStart, counter):
-		pass
+	def assignClass(self, job):
+		if(job.ERPT <= MachineClass.Threshold):
+			job.priorityClass = 0
+		else:
+			job.priorityClass = 1
 
 	# Router sends job to servers and adds job to their queue
 	# Compare to server last routed to of the same class, send to next one
@@ -1130,7 +1126,7 @@ class MachineClass(object):
 
 		self.updateJobs()		# update all processing jobs
 
-		self.assignClass(numClasses, J, MachineClass.PreviousJobs, 0, 0)	# Give job a class, and add to queue
+		self.assignClass(J)	# Give job a class, and add to queue
 		serverID = self.router(J, numClasses)								# Send job to a server queue
 		procJob = MachineClass.ProcessingJobs[serverID]
 
