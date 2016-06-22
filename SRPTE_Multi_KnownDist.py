@@ -15,8 +15,8 @@ from datetime import datetime
 from math import log
 
 import plotly.plotly as py
-import plotly.graph_objs as go
 from plotly.graph_objs import Scatter
+import plotly.graph_objs as go
 from itertools import cycle
 
 import random
@@ -191,7 +191,7 @@ class GUI(Tk):
 		)
 		)
 		fig = go.Figure(data=data, layout=layout)
-		unique_url = py.plot(fig, filename = 'SRPT_NumJobs')
+		unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys')
 
 		#-----------------------------------------------------------------------------#
 		# Average jobs/class
@@ -219,7 +219,7 @@ class GUI(Tk):
 		)
 		)
 		fig1 = go.Figure(data=data1, layout=layout1)
-		unique_url1 = py.plot(fig1, filename = 'SRPT_NumJobsPerClass')
+		unique_url1 = py.plot(fig1, filename = 'SRPT_NumJobsInSysPerClass')
 
 	def calcVariance(self, List, avg):
 		var = 0
@@ -259,6 +259,7 @@ class GUI(Tk):
 				I.valuesList[5],				# num class
 				I.valuesList[6])				# sim time
 
+
 		self.saveParams(I.valuesList[1],		#load
 					'?', 						# arrival rate
 					'Exponential',				# arrival dist
@@ -271,7 +272,7 @@ class GUI(Tk):
 					JobClass.BPArray[0],		# alpha
 					JobClass.BPArray[1],		# lower
 					JobClass.BPArray[2])		# upper	
- 		print "DONE SAVING..."
+
 		self.plotNumJobsInSys(I.valuesList[5])
 		self.updateStatusBar("Simulation complete.")
 
@@ -305,7 +306,7 @@ class Input(LabelFrame):
 		self.percentErrorMinInput.set(0)          ##################################CHANGE LATER
 		self.percentErrorMaxInput.set(0)          ##################################CHANGE LATER
 		self.numberOfClassesInput.set(2)			##################################CHANGE LATER
-		self.simLengthInput.set(5000.0)           ##################################CHANGE LATER
+		self.simLengthInput.set(100.0)           ##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=2)
 		self.grid_columnconfigure(1, weight=2)
