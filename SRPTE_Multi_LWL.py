@@ -32,7 +32,6 @@ conn=sqlite3.connect('MultiServerDatabase_SRPTE_LWL.db')
 
 NumJobs = []
 NumJobsTime = []
-#NUM_SERVERS = 0
 
 #----------------------------------------------------------------------#
 # Class: GUI
@@ -271,7 +270,7 @@ class Input(LabelFrame):
 		self.processingRateInput.set(0.5)   	    ##################################CHANGE LATER
 		self.percentErrorMinInput.set(-50)          ##################################CHANGE LATER
 		self.percentErrorMaxInput.set(0)          ##################################CHANGE LATER
-		self.simLengthInput.set(1000000.0)           ##################################CHANGE LATER
+		self.simLengthInput.set(5000000.0)           ##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=2)
 		self.grid_columnconfigure(1, weight=2)
@@ -994,12 +993,15 @@ class MachineClass(object):
 		#Update other processing jobs (in case next event should be completion)
 		self.updateJobs()
 
-		#Once job has completed remove any remaining processing time for that job due to error estimation (only if overestimated?)
+		#Once job has completed remove any remaining processing time for that job due to error estimation
 		MachineClass.WorkLeft[serverID] -= completingJob.ERPT
 
 		#If there is a job waiting for this server, process it
 		if (MachineClass.ServerQueues[serverID].Size > 0):
 			self.processJobs()
+		else:
+			MachineClass.WorkLeft[serverID] = 0.0 ################### TO COMPENSATE FOR FLOATING POINT ERROR
+																 #### some variables hold more sig digs than others... why?
 
 
 	def run(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, simLength):
