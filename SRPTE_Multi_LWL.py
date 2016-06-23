@@ -1042,7 +1042,7 @@ class MachineClass(object):
 #----------------------------------------------------------------------#
 def main():
 	window = GUI(None)                           			   # instantiate the class with no parent (None)
-	window.title('Class-Based Multi-Server SRPT with Errors')  # title the window
+	window.title('SRPT Multi Least Work Left')  # title the window
 
 	# Global variables used in JobClass
 	main.timesClicked = 0       
