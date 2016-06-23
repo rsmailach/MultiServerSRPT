@@ -10,7 +10,10 @@
 # Rachel Mailach
 #----------------------------------------------------------------------#
 
-from Tkinter import *
+from tkinter import *
+#from tkinter import messagebox
+from tkinter import ttk 
+from tkinter import filedialog
 from datetime import datetime
 from math import log
 
@@ -20,13 +23,10 @@ import plotly.graph_objs as go
 from itertools import cycle
 
 import random
-import tkMessageBox
-import ttk
-import tkFileDialog
-import sympy
-
 import sqlite3
 import pandas
+import sympy
+import numpy
 
 conn=sqlite3.connect('MultiServerDatabase_SRPTE_KnownDist.db')
 
@@ -45,8 +45,8 @@ class GUI(Tk):
 		self.master = master        # reference to parent
 		self.statusText = StringVar()
 		global SEED
-		#SEED = random.randint(0, 1000000000)
-		SEED = 994863731
+		SEED = random.randint(0, 1000000000)
+		#SEED = 994863731
 		random.seed(SEED)
 
 		# Create the input frame
@@ -105,7 +105,7 @@ class GUI(Tk):
 
 	def saveData(self, event):
 		# Get filename
-		filename = tkFileDialog.asksaveasfilename(title="Save as...", defaultextension='.txt')
+		filename = filedialog.asksaveasfilename(title="Save as...", defaultextension='.txt')
 		
 		if filename:
 			file = open(filename, mode='w')
@@ -147,29 +147,29 @@ class GUI(Tk):
 		self.writeToConsole("Simulation Length = %.4f\n\n"%simLength)
 
 	def saveParams(self, load, arrRate, arrDist, procRate, procDist, percErrorMin, percErrorMax, numClasses, simLength, alpha, lower, upper):
-		params = pandas.DataFrame({	'seed' : [SEED],
-									'numServers' : [NUM_SERVERS],
-									'load' : [load],
-									'arrRate' : [arrRate],
-									'arrDist' : [arrDist],
-									'procRate' : [procRate],
-									'procDist' : [procDist],
-									'alpha' : [alpha],
-									'lower' : [lower],
-									'upper' : [upper],
-									'percErrorMin' : [percErrorMin],
-									'percErrorMax' : [percErrorMax],
-									'numClasses' : [numClasses],
-									'simLength' : [simLength],
-									'avgNumJobs' : [MachineClass.AvgNumJobs]
+		params = pandas.DataFrame({	'seed' : [int(SEED)],
+									'numServers' : [int(NUM_SERVERS)],
+									'load' : [float(load)],
+									'arrRate' : [float(arrRate)],
+									'arrDist' : [str(arrDist)],
+									'procRate' : [float(procRate)],
+									'procDist' : [str(procDist)],
+									'alpha' : [float(alpha)],
+									'lower' : [float(lower)],
+									'upper' : [float(upper)],
+									'percErrorMin' : [float(percErrorMin)],
+									'percErrorMax' : [float(percErrorMax)],
+									'numClasses' : [int(numClasses)],
+									'simLength' : [float(simLength)],
+									'avgNumJobs' : [float(MachineClass.AvgNumJobs)]
 									})
 
 		params.to_sql(name='parameters', con=conn, if_exists='append')
-		print params
+		print (params)
 
 	def plotNumJobsInSys(self, numClasses):
 		py.sign_in('mailacrs','wowbsbc0qo')
-		trace0 = Scatter(x=NumJobsTime, y=NumJobs)
+		trace0 = Scatter(x=numpy.array(NumJobsTime, dtype=numpy.float64), y=numpy.array(NumJobs, dtype=numpy.float64))
 		data = [trace0]
 		layout = go.Layout(
 			title='Average Number of Jobs Over Time',
@@ -195,7 +195,7 @@ class GUI(Tk):
 
 		#-----------------------------------------------------------------------------#
 		# Average jobs/class
-		trace1 = go.Bar(y= MachineClass.NumJobsClass)
+		trace1 = go.Bar(y=numpy.array(MachineClass.NumJobsClass, dtype=numpy.float64))
 		
 		data1 = [trace1]
 		layout1 = go.Layout(
@@ -260,11 +260,11 @@ class GUI(Tk):
 				I.valuesList[6])				# sim time
 
 
-		self.saveParams(I.valuesList[1],		#load
-					'?', 						# arrival rate
+		self.saveParams(I.valuesList[1],		# load 			
+					'111111111111.1', 			# arrival Rate 			CHANGE LATER
 					'Exponential',				# arrival dist
-					'?',						# proc rate
-					I.distList[1],				# processing dist
+					'111111111111.1',			# proc rate   			CHANGE LATER
+					I.distList[1],				# processing dist 	
 					I.valuesList[3], 			# error min
 					I.valuesList[4],			# error max
 					I.valuesList[5], 			# num classes
@@ -549,7 +549,7 @@ class CustomDist(object):
 			elif self.stringList[i] == "l" and self.stringList[i+1] == "n":
 				self.stringList[i] = "log"
 				self.stringList[i+1] = ""
-		print "".join(self.stringList)
+		print ("".join(self.stringList))
 		return "".join(self.stringList)
 
 
@@ -625,7 +625,7 @@ class BoundedParetoDist(object):
 		self.l = float(self.e2.get())
 		self.u = float(self.e3.get())
 		if (self.a <= 0) or (self.u < self.l) or (self.l <= 0):
-			print "ERROR: Bounded pareto paramater error"
+			print ("ERROR: Bounded pareto paramater error")
 			self.errorMessage.set("Bounded pareto paramater error")
 			return 1
 		else:
@@ -736,7 +736,7 @@ class LinkedList(object):
 			self.Size -= 1
 			#print "REMOVING HEAD"
 		else:
-			print "ERROR: The linked list is already empty!"
+			print ("ERROR: The linked list is already empty!")
 
 	# Return first item in queue
 	def getHead(self):
@@ -749,9 +749,9 @@ class LinkedList(object):
 
 	def printList(self, serverID):
 		current = self.head
-		print "\nJOBS IN QUEUE %s: "%serverID
+		print ("\nJOBS IN QUEUE %s: "%serverID)
 		while (current != None):
-			print "%s, class %s, ERPT = %.4f"%(current.job.name, current.job.priorityClass, current.job.ERPT)
+			print ("%s, class %s, ERPT = %.4f"%(current.job.name, current.job.priorityClass, current.job.ERPT))
 			current = current.nextNode
 
 
@@ -842,8 +842,7 @@ class JobClass(object):
 	
 
 		# Sub in to solve
-		main.customEquation = BoundedParetoDist.Function.subs(dict(x=random.uniform(0.0, 1.0), alpha = JobClass.BPArray[0],
-		L = JobClass.BPArray[1], U = JobClass.BPArray[2]))
+		main.customEquation = BoundedParetoDist.Function.subs(dict(x=random.uniform(0.0, 1.0), alpha = JobClass.BPArray[0], L = JobClass.BPArray[1], U = JobClass.BPArray[2]))
 		return main.customEquation
 
 	# Generates a percent error for processing time
@@ -957,6 +956,7 @@ class MachineClass(object):
 
 	# Give arriving job a class and add it to the queue
 	def setThreshold(self):
+		import sympy
 		# f(x) is probability density of processing times 
 		# Using Bounded Pareto,
 			# f(x) = {0 if x < 0, main.customEquation if x >= 0}
@@ -970,10 +970,10 @@ class MachineClass(object):
 		#HOW TO FIND THRESHOLD
 		# integral{from L to T} x*f(x)dx / integral{from L to U} x*f(x)dx = 0.8 (becasue 80% of jobs will be small)
 		# solve for T
-		x, L, U, T, alpha= sympy.symbols('x L U T alpha', real=True)
+		x, L, U, T, alpha = sympy.symbols('x L U T alpha', real=True)
 		
 		numerator = sympy.integrate((x*BoundedParetoDist.Function), (x, L, T))
-		denominator = sympy.integrate(x*BoundedParetoDist.Function, (x, L, U))
+		denominator = sympy.integrate((x*BoundedParetoDist.Function), (x, L, U))
 		expected = numerator/denominator
 
 		#expected = expected.subs(dict(alpha=JobClass.BPArray[0], L=JobClass.BPArray[1], U=JobClass.BPArray[2]))
@@ -1121,7 +1121,7 @@ class MachineClass(object):
 
 		if (self.ctr == 0):
 			self.setThreshold()
-		
+	
 		self.calcNumJobs(self.ctr)
 		self.calcNumJobsPerClass(numClasses)
 
@@ -1131,7 +1131,7 @@ class MachineClass(object):
 		serverID = self.router(J, numClasses)								# Send job to a server queue
 		procJob = MachineClass.ProcessingJobs[serverID]
 
-		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s, server = %s"%(MachineClass.CurrentTime, J.name, J.priorityClass, serverID))		
+		GUI.writeToConsole(self.master, "%.6f | %s arrived, class = %s, server = %s, erpt=%.6f"%(MachineClass.CurrentTime, J.name, J.priorityClass, serverID, J.ERPT))		
 
 		# Preempt processing job at server if new job has higher priority class
 		if (procJob != None):
@@ -1234,7 +1234,7 @@ class MachineClass(object):
 #----------------------------------------------------------------------#
 def main():
 	window = GUI(None)                           			   # instantiate the class with no parent (None)
-	window.title('Class-Based Multi-Server SRPT with Errors')  # title the window
+	window.title('SRPTE Multi KnownDist')  # title the window
 
 	# Global variables used in JobClass
 	main.timesClicked = 0       
