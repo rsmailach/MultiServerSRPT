@@ -10,22 +10,18 @@
 # Rachel Mailach
 #----------------------------------------------------------------------#
 
-from Tkinter import *
+from tkinter import *
+#from tkinter import messagebox
+from tkinter import ttk 
+from tkinter import filedialog
 from datetime import datetime
-from math import log
+
 import plotly.plotly as py
 from plotly.graph_objs import Scatter
 import plotly.graph_objs as go
 from itertools import cycle
 
-import copy
 import random
-import tkMessageBox
-import ttk
-import tkFileDialog
-import csv
-import operator
-
 import sqlite3
 import pandas
 
@@ -107,7 +103,7 @@ class GUI(Tk):
 
 	def saveData(self, event):
 		# Get filename
-		filename = tkFileDialog.asksaveasfilename(title="Save as...", defaultextension='.txt')
+		filename = fileDialog.asksaveasfilename(title="Save as...", defaultextension='.txt')
 		
 		if filename:
 			file = open(filename, mode='w')
@@ -163,12 +159,12 @@ class GUI(Tk):
 									'percErrorMax' : [percErrorMax],
 									'numClasses' : [numClasses],
 									'simLength' : [simLength],
-									'avgNumJobs' : [MachineClass.AvgNumJobs],
+									'avgNumJobs' : [MachineClass.AvgNumJobs]
 									#'avgNumJobsClass' : [MachineClass.AvgNumJobsClass]
 									})
 
 		params.to_sql(name='parameters', con=conn, if_exists='append')
-		print params
+		print (params)
 
 	def plotNumJobsInSys(self, numClasses):
 		py.sign_in('mailacrs','wowbsbc0qo')
@@ -264,16 +260,16 @@ class GUI(Tk):
 
 		self.saveParams(I.valuesList[1],		#load
 					'?', 						# arrival rate
-					'Exponential',					# arrival dist
-					'?', I.distList[1],	# processing
-					I.valuesList[3], 				# error min
-					I.valuesList[4],				# error max
-					I.valuesList[5], 				# num classes
-					I.valuesList[6],				# sim time
-					JobClass.BPArray[0],			# alpha
-					JobClass.BPArray[1],			# lower
-					JobClass.BPArray[2])			# upper				
-
+					'Exponential',				# arrival dist
+					'?',						# proc rate
+					I.distList[1],				# processing dist
+					I.valuesList[3], 			# error min
+					I.valuesList[4],			# error max
+					I.valuesList[5], 			# num classes
+					I.valuesList[6],			# sim time
+					JobClass.BPArray[0],		# alpha
+					JobClass.BPArray[1],		# lower
+					JobClass.BPArray[2])		# upper	
 		self.plotNumJobsInSys(I.valuesList[5])
 		self.updateStatusBar("Simulation complete.")
 
@@ -307,7 +303,7 @@ class Input(LabelFrame):
 		self.percentErrorMinInput.set(-50)          ##################################CHANGE LATER
 		self.percentErrorMaxInput.set(0)          ##################################CHANGE LATER
 		self.numberOfClassesInput.set(10)			##################################CHANGE LATER
-		self.simLengthInput.set(1000000.0)           ##################################CHANGE LATER
+		self.simLengthInput.set(5000000.0)           ##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=2)
 		self.grid_columnconfigure(1, weight=2)
@@ -550,7 +546,7 @@ class CustomDist(object):
 			elif self.stringList[i] == "l" and self.stringList[i+1] == "n":
 				self.stringList[i] = "log"
 				self.stringList[i+1] = ""
-		print "".join(self.stringList)
+		print ("".join(self.stringList))
 		return "".join(self.stringList)
 
 
@@ -623,7 +619,7 @@ class BoundedParetoDist(object):
 		self.l = float(self.e2.get())
 		self.u = float(self.e3.get())
 		if (self.a <= 0) or (self.u < self.l) or (self.l <= 0):
-			print "ERROR: Bounded pareto paramater error"
+			print ("ERROR: Bounded pareto paramater error")
 			self.errorMessage.set("Bounded pareto paramater error")
 			return 1
 		else:
@@ -728,7 +724,7 @@ class LinkedList(object):
 			self.Size -= 1
 			#print "REMOVING HEAD"
 		else:
-			print "ERROR: The linked list is already empty!"
+			print ("ERROR: The linked list is already empty!")
 
 	# Return first item in queue
 	def getHead(self):
@@ -741,9 +737,9 @@ class LinkedList(object):
 
 	def printList(self, serverID):
 		current = self.head
-		print "\nJOBS IN QUEUE %s: "%serverID
+		print ("\nJOBS IN QUEUE %s: "%serverID)
 		while (current != None):
-			print "%s, class %s, ERPT = %.4f"%(current.job.name, current.job.priorityClass, current.job.ERPT)
+			print ("%s, class %s, ERPT = %.4f"%(current.job.name, current.job.priorityClass, current.job.ERPT))
 			current = current.nextNode
 
 
@@ -1104,8 +1100,24 @@ class MachineClass(object):
 		# PrevNum jobs becomes current num jobs
 		MachineClass.PrevNumJobsArray = list(totalNumJobs)
 
-	def calcNumJobsPerClassPerServer(self):
-		pass
+	def insertLargeJob(self, counter, procDist, numClasses):
+		J = JobClass(self.master)
+		J.setJobAttributes(1, 1, procDist, 0,0)
+		J.name = "JobXXXX" + str(counter)
+		J.RPT = 10000
+		J.ERPT = 5000
+		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
+		
+		self.calcNumJobs(self.ctr)
+
+		self.updateJobs()	# update data in queue
+		self.assignClass(numClasses, J, MachineClass.PreviousJobs, 0, 0)	# Give job a class, and add to queue
+		serverID = self.router(J, numClasses)								# Send job to a server queue
+		self.processJobs()	# process first job in queue
+
+		# Generate next arrival
+		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, 'Exponential')		
+
 
 	# Job arriving
 	def arrivalEvent(self, load, arrDist, procRate, procDist, numClasses, percErrorMin, percErrorMax):
@@ -1188,11 +1200,22 @@ class MachineClass(object):
 
 
 	def run(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, numClasses, simLength):
+		counter = 1;
 		while 1:
 			# Generate time of first job arrival
 			if(self.ctr == 0):
 				arrRate = float(load) / procRate
 				MachineClass.TimeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
+
+			#Inject large jobs
+			if(MachineClass.CurrentTime >= 2000000.0 and counter == 1):
+				self.insertLargeJob(counter, procDist, numClasses);
+				counter += 1;
+				print ("FIRST LARGE JOB INJECTED");
+			elif(MachineClass.CurrentTime >= 2000500.0 and counter == 2):
+				self.insertLargeJob(counter, procDist, numClasses);
+				counter += 1;
+				print ("SECOND LARGE JOB INJECTED");	
 
 
 			# Find shortest RPT of all processing jobs		

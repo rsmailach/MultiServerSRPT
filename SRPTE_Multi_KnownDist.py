@@ -45,8 +45,8 @@ class GUI(Tk):
 		self.master = master        # reference to parent
 		self.statusText = StringVar()
 		global SEED
-		SEED = random.randint(0, 1000000000)
-		#SEED = 994863731
+		#SEED = random.randint(0, 1000000000)
+		SEED = 994863731
 		random.seed(SEED)
 
 		# Create the input frame
@@ -161,7 +161,8 @@ class GUI(Tk):
 									'percErrorMax' : [float(percErrorMax)],
 									'numClasses' : [int(numClasses)],
 									'simLength' : [float(simLength)],
-									'avgNumJobs' : [float(MachineClass.AvgNumJobs)]
+									'avgNumJobs' : [float(MachineClass.AvgNumJobs)],
+									'threshold' : [float(MachineClass.Threshold)]
 									})
 
 		params.to_sql(name='parameters', con=conn, if_exists='append')
@@ -303,10 +304,10 @@ class Input(LabelFrame):
 		self.loadInput.set(0.90)       		 	   	##################################CHANGE LATER
 		#self.arrivalRateInput.set(1.0)         	 ##################################CHANGE LATER
 		self.processingRateInput.set(0.5)   	    ##################################CHANGE LATER
-		self.percentErrorMinInput.set(0)          ##################################CHANGE LATER
+		self.percentErrorMinInput.set(-50)          ##################################CHANGE LATER
 		self.percentErrorMaxInput.set(0)          ##################################CHANGE LATER
 		self.numberOfClassesInput.set(2)			##################################CHANGE LATER
-		self.simLengthInput.set(100.0)           ##################################CHANGE LATER
+		self.simLengthInput.set(5000000.0)           ##################################CHANGE LATER
 
 		self.grid_columnconfigure(0, weight=2)
 		self.grid_columnconfigure(1, weight=2)
@@ -982,8 +983,11 @@ class MachineClass(object):
 		#print expected
 		
 		#Equate expected = 0.8, solve for T
-		thresholdRange = sympy.solve(sympy.Eq(expected, 0.8), T)
-		MachineClass.Threshold = thresholdRange[1] #set only positive number
+		#thresholdRange = sympy.solve(sympy.Eq(expected, 0.8), T)
+		#MachineClass.Threshold = thresholdRange[1] #set only positive number
+
+		##FORCE THRESHOLD AS LOGICAL VALUE
+		MachineClass.Threshold = 800000
 		GUI.writeToConsole(self.master, "Class threshold = %s"%MachineClass.Threshold)
 
 		

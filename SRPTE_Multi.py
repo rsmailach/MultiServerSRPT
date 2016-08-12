@@ -9,15 +9,17 @@
 # Rachel Mailach
 #----------------------------------------------------------------------#
 
-from Tkinter import *
+from tkinter import *
+#from tkinter import messagebox
+from tkinter import ttk 
+from tkinter import filedialog
 from datetime import datetime
+
 import plotly.plotly as py
 from plotly.graph_objs import Scatter
 import plotly.graph_objs as go
+
 import random
-import tkMessageBox
-import ttk
-import tkFileDialog
 import sqlite3
 import pandas
 
@@ -94,7 +96,7 @@ class GUI(Tk):
 
 	def saveData(self, event):
 		# Get filename
-		filename = tkFileDialog.asksaveasfilename(title="Save as...", defaultextension='.txt')
+		filename = fileDialog.asksaveasfilename(title="Save as...", defaultextension='.txt')
 		
 		if filename:
 			file = open(filename, mode='w')
@@ -135,7 +137,7 @@ class GUI(Tk):
 
 	def saveParams(self, numServers, load, arrRate, arrDist, procRate, procDist, percErrorMin, percErrorMax, simLength, alpha, lower, upper):
 		##params = pandas.DataFrame(columns=('seed', 'numServers', 'load', 'arrRate', 'arrDist', 'procRate', 'procDist', 'alpha', 'lower', 'upper', 'percErrorMin', 'percErrorMax', 'simLength'))
-		print SEED
+		print (SEED)
 		params = pandas.DataFrame({	'seed' : [SEED],
 									'numServers' : [numServers],
 									'load' : [load],
@@ -153,7 +155,7 @@ class GUI(Tk):
 									})
 
 		params.to_sql(name='parameters', con=conn, if_exists='append')
-		print params
+		print (params)
 
 	def printParams(self, numServers, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, simLength):
 		self.writeToConsole("--------------------------------------------------------------------------------")
@@ -295,7 +297,7 @@ class Input(LabelFrame):
 		self.processingRateInput.set(self.procRateDefault)
 		self.percentErrorMinInput.set(-50)
 		self.percentErrorMaxInput.set(0)
-		self.simLengthInput.set(1000000.0)
+		self.simLengthInput.set(5000000.0)
 
 		self.grid_columnconfigure(0, weight=2)
 		self.grid_columnconfigure(1, weight=2)
@@ -389,6 +391,8 @@ class Input(LabelFrame):
 		try:
 			numberOfServers = self.numServersInput.get()
 			load = self.loadInput.get()
+			#arrivalRate = self.arrivalRateInput.get()
+			processingRate = self.processingRateInput.get()
 			percentErrorMin = self.percentErrorMinInput.get()
 			percentErrorMax = self.percentErrorMaxInput.get()
 			maxSimLength = self.simLengthInput.get()
@@ -396,14 +400,14 @@ class Input(LabelFrame):
 			self.errorMessage.set("One of your inputs is an incorrect type, try again.")
 			return 1
 
-		try:
-			arrRate = float(self.arrivalRateInput.get())
-		except ValueError:
-			arrRate = 0.0
-		try:
-			procRate = float(self.processingRateInput.get())
-		except ValueError:
-			procRate = 0.0
+		#try:
+		#	arrRate = float(self.arrivalRateInput.get())
+		#except ValueError:
+		#	arrRate = 0.0
+		#try:
+		#	procRate = float(self.processingRateInput.get())
+		#except ValueError:
+		#	procRate = 0.0
 
 		if load <= 0.0:
 			self.errorMessage.set("System load must be a non-zero value!")
@@ -422,7 +426,7 @@ class Input(LabelFrame):
 			return 1
 		else:
 			self.errorMessage.set("")
-			Input.valuesList = [numberOfServers, load, arrRate, procRate, percentErrorMin, percentErrorMax, maxSimLength]
+			Input.valuesList = [numberOfServers, load, 0.0, processingRate, percentErrorMin, percentErrorMax, maxSimLength]
 			return 0
 
 	def getDropDownValues(self):
@@ -544,7 +548,7 @@ class CustomDist(object):
 			elif self.stringList[i] == "l" and self.stringList[i+1] == "n":
 				self.stringList[i] = "log"
 				self.stringList[i+1] = ""
-		print "".join(self.stringList)
+		print ("".join(self.stringList))
 		return "".join(self.stringList)
 
 #----------------------------------------------------------------------#
@@ -616,7 +620,7 @@ class BoundedParetoDist(object):
 		self.l = float(self.e2.get())
 		self.u = float(self.e3.get())
 		if (self.a <= 0) or (self.u < self.l) or (self.l <= 0):
-			print "ERROR: Bounded pareto paramater error"
+			print ("ERROR: Bounded pareto paramater error")
 			self.errorMessage.set("Bounded pareto paramater error")
 			return 1
 		else:
@@ -675,7 +679,7 @@ class LinkedList(object):
 			self.head = self.head.nextNode		# move head forward one node
 			LinkedList.Size -= 1
 		else:
-			print "ERROR: The linked list is already empty!!"
+			print ("ERROR: The linked list is already empty!!")
 
 	def clear(self):
 		self.head = None
@@ -683,7 +687,7 @@ class LinkedList(object):
 	def printList(self):
 		current = self.head
 		while (current != None):
-			print current.job.name, current.job.ERPT
+			print (current.job.name, current.job.ERPT)
 			current = current.nextNode
 
 
@@ -887,6 +891,23 @@ class MachineClass(object):
 		NumJobs.append(MachineClass.AvgNumJobs)				# y axis of plot
 		NumJobsTime.append(MachineClass.CurrentTime)		# x axis of plot			
 
+	def insertLargeJob(self, counter, procDist):
+		J = JobClass(self.master)
+		J.setJobAttributes(1, 1, procDist, 0,0)
+		J.name = "JobXXXX" + str(counter)
+		J.RPT = 10000
+		J.ERPT = 5000
+		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
+		
+		self.calcNumJobs(self.ctr)
+
+		self.updateJobs()	# update data in queue
+		MachineClass.Queue.insert(J)	# add job to queue
+		self.processJobs()	# process first job in queue
+
+		# Generate next arrival
+		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, 'Exponential')		
+
 	# Job arriving
 	def arrivalEvent(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax):
 		J = JobClass(self.master)
@@ -968,11 +989,23 @@ class MachineClass(object):
 
 
 	def run(self, load, arrDist, procRate, procDist, percErrorMin, percErrorMax, simLength):
+		counter = 1;
 		while 1:
 			# Generate time of first job arrival
 			if(self.ctr == 0):
 				arrRate = float(load) / procRate
 				MachineClass.TimeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
+
+			#Inject large jobs
+			if(MachineClass.CurrentTime >= 2000000.0 and counter == 1):
+				self.insertLargeJob(counter, procDist);
+				counter += 1;
+				print ("FIRST LARGE JOB INJECTED");
+			elif(MachineClass.CurrentTime >= 2000500.0 and counter == 2):
+				self.insertLargeJob(counter, procDist);
+				counter += 1;
+				print ("SECOND LARGE JOB INJECTED");			
+
 
 			# Find shortest RPT of all processing jobs		
 			try:
