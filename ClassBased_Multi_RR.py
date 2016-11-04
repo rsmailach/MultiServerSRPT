@@ -24,10 +24,13 @@ from itertools import cycle
 import random
 import sqlite3
 import pandas
+import csv
+import os
 
 conn=sqlite3.connect('MultiServerDatabase_ASRPTE_RR.db')
 
 NumJobs = []
+AvgNumJobs = []
 NumJobsTime = []
 #NUM_SERVERS = 0
 
@@ -166,9 +169,9 @@ class GUI(Tk):
 		params.to_sql(name='parameters', con=conn, if_exists='append')
 		print (params)
 
-	def plotNumJobsInSys(self, numClasses):
+	def plotAvgNumJobsInSys(self, numClasses):
 		py.sign_in('mailacrs','wowbsbc0qo')
-		trace0 = Scatter(x=NumJobsTime, y=NumJobs)
+		trace0 = Scatter(x=NumJobsTime, y=AvgNumJobs)
 		data = [trace0]
 		layout = go.Layout(
 			title='Average Number of Jobs Over Time',
@@ -190,7 +193,7 @@ class GUI(Tk):
 		)
 		)
 		fig = go.Figure(data=data, layout=layout)
-		unique_url = py.plot(fig, filename = 'SRPT_NumJobsInSys')
+		unique_url = py.plot(fig, filename = 'Class-Based_AvgNumJobsInSys')
 
 		#-----------------------------------------------------------------------------#
 		# Average jobs/class
@@ -218,7 +221,33 @@ class GUI(Tk):
 		)
 		)
 		fig1 = go.Figure(data=data1, layout=layout1)
-		unique_url1 = py.plot(fig1, filename = 'SRPT_NumJobsInSysPerClass')
+		unique_url1 = py.plot(fig1, filename = 'Class-Based_NumJobsInSysPerClass')
+
+	def plotNumJobsInSys(self):
+		py.sign_in('mailacrs','wowbsbc0qo')
+		trace0 = Scatter(x=NumJobsTime, y=NumJobs)
+		data = [trace0]
+		layout = go.Layout(
+			title='Number of Jobs Over Time',
+			xaxis=dict(
+				title='Time',
+				titlefont=dict(
+				family='Courier New, monospace',
+				size=18,
+				color='#7f7f7f'
+			)
+		),
+			yaxis=dict(
+				title='Number of Jobs',
+				titlefont=dict(
+				family='Courier New, monospace',
+				size=18,
+				color='#7f7f7f'
+			)
+		)
+		)
+		fig = go.Figure(data=data, layout=layout)
+		unique_url = py.plot(fig, filename = 'Class-Based_NumJobsInSys')		
 
 	def calcVariance(self, List, avg):
 		var = 0
@@ -270,7 +299,8 @@ class GUI(Tk):
 					JobClass.BPArray[0],		# alpha
 					JobClass.BPArray[1],		# lower
 					JobClass.BPArray[2])		# upper	
-		self.plotNumJobsInSys(I.valuesList[5])
+		self.plotNumJobsInSys()
+		self.plotAvgNumJobsInSys(I.valuesList[5])
 		self.updateStatusBar("Simulation complete.")
 
 
@@ -297,7 +327,7 @@ class Input(LabelFrame):
 		self.comboboxVal = StringVar()
 
 		self.numServersInput.set(2)					##################################CHANGE LATER	
-		self.loadInput.set(0.90)       		 	   	##################################CHANGE LATER
+		self.loadInput.set(0.70)       		 	   	##################################CHANGE LATER
 		#self.arrivalRateInput.set(1.0)         	 ##################################CHANGE LATER
 		self.processingRateInput.set(0.5)   	    ##################################CHANGE LATER
 		self.percentErrorMinInput.set(-50)          ##################################CHANGE LATER
@@ -571,7 +601,7 @@ class BoundedParetoDist(object):
 		self.U = DoubleVar()
 
 		# Set default parameters
-		self.alpha.set(1.1)
+		self.alpha.set(1.5)
 		self.L.set(1)
 		self.U.set(10**(6))
 
@@ -924,6 +954,7 @@ class MachineClass(object):
 		MachineClass.counter = 0
 
 		NumJobs[:] = []
+		AvgNumJobs[:] = []
 		NumJobsTime[:] = []
 	
 		self.ctr = 0
@@ -1032,7 +1063,7 @@ class MachineClass(object):
 			MachineClass.ServerQueues[serverID].insertByClass(job)				# add job to queue
 			#GUI.writeToConsole(self.master, "sending job %s, class %s to server %s CLASS"%(job.name, job.priorityClass, serverID))
 
-	def calcNumJobs(self, jobID):
+	def calcNumJobs(self, jobID, load):
 		self.currentNumJobs = 0
 		for serverID in range(NUM_SERVERS):
 			# Firstly, add all jobs that are waiting in queue
@@ -1057,8 +1088,11 @@ class MachineClass(object):
 		# PrevNum jobs becomes current num jobs
 		MachineClass.PrevNumJobs = self.currentNumJobs
 
-		NumJobs.append(MachineClass.AvgNumJobs)				# y axis of plot
+		NumJobs.append(self.currentNumJobs)					# y axis of plot
+		AvgNumJobs.append(MachineClass.AvgNumJobs)			# y axis of plot
 		NumJobsTime.append(MachineClass.CurrentTime)		# x axis of plot
+		self.saveNumJobs(load, MachineClass.CurrentTime, self.currentNumJobs)
+		self.saveAvgNumJobs(load, MachineClass.CurrentTime, MachineClass.AvgNumJobs)
 
 
 	def calcNumJobsPerClass(self, numClasses):
@@ -1100,23 +1134,23 @@ class MachineClass(object):
 		# PrevNum jobs becomes current num jobs
 		MachineClass.PrevNumJobsArray = list(totalNumJobs)
 
-	def insertLargeJob(self, counter, procDist, numClasses):
-		J = JobClass(self.master)
-		J.setJobAttributes(1, 1, procDist, 0,0)
-		J.name = "JobXXXX" + str(counter)
-		J.RPT = 10000
-		J.ERPT = 5000
-		GUI.writeToConsole(self.master, "%.6f | %s arrived, ERPT = %.5f"%(MachineClass.CurrentTime, J.name, J.ERPT))
+	def saveNumJobs(self, load, numJobs, time):
+		text = "%f,%f"%(numJobs, time) + "\n"
+		scaledLoad = int(load * 100)
+		path = "./MULTI_SERVER_RESULTS/Class/Class_Num_load=%s_alpha=%s_servers=%s.txt"%(scaledLoad, JobClass.BPArray[0], NUM_SERVERS)
 		
-		self.calcNumJobs(self.ctr)
+		with open(path, "a") as myFile:
+			myFile.write(text)
+		myFile.close()				
 
-		self.updateJobs()	# update data in queue
-		self.assignClass(numClasses, J, MachineClass.PreviousJobs, 0, 0)	# Give job a class, and add to queue
-		serverID = self.router(J, numClasses)								# Send job to a server queue
-		self.processJobs()	# process first job in queue
+	def saveAvgNumJobs(self, load, avgNumJobs, time):
+		text = "%f,%f"%(avgNumJobs, time) + "\n"
+		scaledLoad = int(load * 100)
+		path = "./MULTI_SERVER_RESULTS/Class/Class_Avg_load=%s_alpha=%s_servers=%s.txt"%(scaledLoad, JobClass.BPArray[0], NUM_SERVERS)
 
-		# Generate next arrival
-		MachineClass.TimeUntilArrival = self.setArrivalDist(J.arrivalRate, 'Exponential')		
+		with open(path, "a") as myFile:
+			myFile.write(text)
+		myFile.close()			
 
 
 	# Job arriving
@@ -1125,7 +1159,7 @@ class MachineClass(object):
 		J.setJobAttributes(load, procRate, procDist, percErrorMin, percErrorMax)
 		J.name = "Job%02d"%self.ctr
 		
-		self.calcNumJobs(self.ctr)
+		self.calcNumJobs(self.ctr, load)
 		self.calcNumJobsPerClass(numClasses)
 
 		self.updateJobs()		# update all processing jobs
@@ -1180,7 +1214,7 @@ class MachineClass(object):
 	def completionEvent(self, numClasses, completingJob, load, percErrorMin, percErrorMax):
 		completingJob.completionTime = MachineClass.CurrentTime
 
-		self.calcNumJobs(self.ctr)
+		self.calcNumJobs(self.ctr, load)
 		self.calcNumJobsPerClass(numClasses)
 
 		# Server no longer busy
@@ -1205,17 +1239,7 @@ class MachineClass(object):
 			# Generate time of first job arrival
 			if(self.ctr == 0):
 				arrRate = float(load) / procRate
-				MachineClass.TimeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival
-
-			#Inject large jobs
-			if(MachineClass.CurrentTime >= 2000000.0 and counter == 1):
-				self.insertLargeJob(counter, procDist, numClasses);
-				counter += 1;
-				print ("FIRST LARGE JOB INJECTED");
-			elif(MachineClass.CurrentTime >= 2000500.0 and counter == 2):
-				self.insertLargeJob(counter, procDist, numClasses);
-				counter += 1;
-				print ("SECOND LARGE JOB INJECTED");	
+				MachineClass.TimeUntilArrival = self.setArrivalDist(arrRate, arrDist) # generate next arrival	
 
 
 			# Find shortest RPT of all processing jobs		
